@@ -1,108 +1,370 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0f1117" />
+<meta name="description" content="Calendar-aware, energy-aware daily planner that turns goals into a realistic plan." />
 <title>AI Execution Planner</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b6ef5'/><path d='M28 52l14 14 30-32' stroke='white' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
-  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 720px; margin: 40px auto; background:#0f1117; color:#e6e6e6; }
-  h1 { font-size: 20px; }
-  section { background:#181b24; border-radius:10px; padding:16px; margin-bottom:16px; }
-  input, button, select { padding:8px; border-radius:6px; border:1px solid #333; background:#0f1117; color:#eee; margin:4px 4px 4px 0; }
-  button { cursor:pointer; background:#3b6ef5; border:none; }
-  li { margin-bottom:6px; }
-  .muted { color:#999; font-size:13px; }
+  :root {
+    --bg:#f5f6f8; --card:#ffffff; --text:#1b1d23; --muted:#6b7080; --line:#e3e5ea;
+    --accent:#3b6ef5; --accent-text:#fff; --ok:#1f9d55; --warn:#c77700; --danger:#d23b3b;
+    --chip:#eef1f6; --high:#e8eefe; --medium:#f1f3f6; --low:#f6f1ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0f1117; --card:#181b24; --text:#e6e6e6; --muted:#9aa0ad; --line:#2a2e3a;
+      --chip:#232734; --high:#1d2744; --medium:#20232d; --low:#2b251d;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  h1 { font-size:20px; margin:0; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  input, select, button { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); }
+  input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  button { cursor:pointer; background:var(--accent); color:var(--accent-text); border:none; font-weight:600; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); font-weight:500; }
+  button.small { padding:4px 8px; font-size:13px; }
+  button.danger { color:var(--danger); }
+  button:disabled { opacity:.6; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > input.grow { flex:1 1 200px; min-width:0; }
+  .muted { color:var(--muted); font-size:13px; }
+  ul { list-style:none; padding:0; margin:12px 0 0; }
+  li { padding:10px 0; border-top:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  li:first-child { border-top:none; }
+  .time { font-variant-numeric:tabular-nums; color:var(--muted); min-width:92px; font-size:14px; }
+  .title { flex:1 1 180px; min-width:0; overflow-wrap:anywhere; }
+  .done .title { text-decoration:line-through; color:var(--muted); }
+  .chip { font-size:12px; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--muted); white-space:nowrap; }
+  .chip.high { background:var(--high); } .chip.low { background:var(--low); }
+  .chip.risk { color:var(--danger); } .chip.okc { color:var(--ok); }
+  .bar { height:6px; background:var(--chip); border-radius:99px; overflow:hidden; flex:1 1 100%; }
+  .bar > span { display:block; height:100%; background:var(--accent); }
+  .banner { background:var(--chip); border-radius:10px; padding:10px 12px; margin-bottom:16px; font-size:14px; }
+  .auth { max-width:400px; margin:8vh auto 0; }
+  .auth input { width:100%; margin-bottom:8px; }
+  .auth button { width:100%; }
+  .tabs { display:flex; gap:4px; margin-bottom:12px; }
+  .tabs button { flex:1; background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .tabs button.on { background:var(--chip); color:var(--text); }
+  .or { text-align:center; margin:14px 0; color:var(--muted); font-size:13px; }
+  .err { color:var(--danger); font-size:14px; min-height:20px; margin:4px 0; }
+  .result { margin-top:10px; font-weight:600; }
+  details > summary { cursor:pointer; color:var(--muted); font-size:13px; margin-top:6px; }
+  #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:90vw; }
+  #toast.show { opacity:1; }
+  [hidden] { display:none !important; }
+  a { color:var(--accent); }
+  @media (prefers-color-scheme: dark) { a { color:#8fb0ff; } }
+  footer { text-align:center; margin-top:24px; }
+  footer a { color:var(--muted); }
 </style>
 </head>
 <body>
-<h1>🧠 AI Execution Planner</h1>
+<div class="wrap">
 
-<section>
-  <h3>1. Connect notifications</h3>
-  <input id="topic" placeholder="pick a secret ntfy topic e.g. mypersonal-planner-8823" style="width:320px" />
-  <button onclick="setupNotif()">Connect</button>
-  <p class="muted">Subscribe to the same topic in the ntfy app (phone) and at ntfy.sh (laptop browser). See README.</p>
-</section>
+<!-- ================= LOGIN / SIGNUP ================= -->
+<div id="authView" class="auth" hidden>
+  <h1 style="margin-bottom:6px">AI Execution Planner</h1>
+  <p class="muted" style="margin-top:0">Turns goals into a realistic daily plan that fits around your calendar and your energy, and replans when you skip something.</p>
+  <section>
+    <div class="tabs">
+      <button id="tabLogin" class="on" onclick="setTab('login')">Log in</button>
+      <button id="tabSignup" onclick="setTab('signup')">Sign up</button>
+    </div>
+    <form id="authForm" onsubmit="submitAuth(event)">
+      <input id="authName" placeholder="Your name (optional)" autocomplete="name" hidden maxlength="80" />
+      <input id="authEmail" type="email" placeholder="Email" autocomplete="email" required maxlength="254" />
+      <input id="authPassword" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" required minlength="8" maxlength="128" />
+      <div class="err" id="authErr"></div>
+      <button id="authBtn" type="submit">Log in</button>
+    </form>
+    <div class="or">or</div>
+    <button class="ghost" style="width:100%" onclick="startDemo()">Try the demo without signing up</button>
+    <p class="muted" style="margin-bottom:0">The demo creates a private sandbox with sample goals. It's deleted after 24 hours.</p>
+  </section>
+</div>
 
-<section>
-  <h3>2. Add a goal</h3>
-  <input id="goalTitle" placeholder="Goal title" style="width:300px" />
-  <input id="goalDeadline" type="date" />
-  <label><input type="checkbox" id="autoDecompose" /> auto-decompose with AI</label>
-  <button onclick="addGoal()">Add Goal</button>
-  <ul id="goalList"></ul>
-</section>
+<!-- ================= APP ================= -->
+<div id="appView" hidden>
+  <header>
+    <h1>AI Execution Planner</h1>
+    <div class="row">
+      <span class="muted" id="whoami"></span>
+      <button class="ghost small" onclick="logout()">Log out</button>
+    </div>
+  </header>
 
-<section>
-  <h3>3. Add a calendar block (busy time)</h3>
-  <input id="calDate" type="date" />
-  <input id="calStart" placeholder="09:00" style="width:70px" />
-  <input id="calEnd" placeholder="10:00" style="width:70px" />
-  <input id="calTitle" placeholder="Meeting" />
-  <button onclick="addCal()">Add</button>
-</section>
+  <div class="banner" id="guestBanner" hidden>
+    You're in a demo sandbox with sample data (deleted after 24h). <a href="#" onclick="logout();setTab('signup');return false">Sign up</a> to keep your own plan.
+  </div>
 
-<section>
-  <h3>4. Today's plan</h3>
-  <button onclick="generatePlan()">Generate Plan</button>
-  <button onclick="loadPlan()">Refresh</button>
-  <ul id="planList"></ul>
-</section>
+  <section>
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Today's plan</h2>
+      <span class="muted" id="capacity"></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button onclick="generatePlan(this)">Generate plan</button>
+      <button class="ghost" onclick="loadPlan()">Refresh</button>
+    </div>
+    <ul id="planList"></ul>
+  </section>
 
-<section>
-  <h3>5. What should I do now?</h3>
-  <input id="freeMin" type="number" placeholder="minutes free" style="width:120px" value="30" />
-  <select id="energy"><option>high</option><option selected>medium</option><option>low</option></select>
-  <button onclick="whatNow()">Ask</button>
-  <p id="whatNowResult"></p>
-</section>
+  <section>
+    <h2>What should I do now?</h2>
+    <div class="row">
+      <input id="freeMin" type="number" min="5" max="720" value="30" style="width:90px" aria-label="minutes free" />
+      <span class="muted">minutes free, energy</span>
+      <select id="energy" aria-label="energy"><option>high</option><option selected>medium</option><option>low</option></select>
+      <button onclick="whatNow()">Ask</button>
+    </div>
+    <div class="result" id="whatNowResult"></div>
+  </section>
+
+  <section>
+    <h2>Goals</h2>
+    <form class="row" onsubmit="addGoal(event)">
+      <input id="goalTitle" class="grow" placeholder="e.g. Learn GenAI in 3 months" required maxlength="200" />
+      <input id="goalDeadline" type="date" aria-label="deadline" />
+      <label class="muted"><input type="checkbox" id="autoDecompose" checked /> break down with AI <span id="aiLeft"></span></label>
+      <button id="goalBtn" type="submit">Add goal</button>
+    </form>
+    <ul id="goalList"></ul>
+  </section>
+
+  <section>
+    <h2>Busy time today</h2>
+    <form class="row" onsubmit="addCal(event)">
+      <input id="calStart" type="time" required aria-label="start" />
+      <span class="muted">to</span>
+      <input id="calEnd" type="time" required aria-label="end" />
+      <input id="calTitle" class="grow" placeholder="Meeting, commute, lunch…" maxlength="120" />
+      <button type="submit">Add</button>
+    </form>
+    <ul id="calList"></ul>
+  </section>
+
+  <section>
+    <h2>Notifications (phone + laptop)</h2>
+    <p class="muted" style="margin-top:0">Get your plan each morning and goal-risk warnings in the evening via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a>. Pick a hard-to-guess topic, subscribe to it in the ntfy app and at ntfy.sh/&lt;topic&gt;, then connect it here.</p>
+    <form class="row" onsubmit="setupNotif(event)">
+      <input id="topic" class="grow" placeholder="e.g. anu-planner-8f21ac" pattern="[A-Za-z0-9_\-]{8,64}" required />
+      <button type="submit">Connect</button>
+      <button type="button" class="ghost" id="disconnectBtn" onclick="disconnectNotif()" hidden>Disconnect</button>
+    </form>
+    <p class="muted" id="notifStatus"></p>
+  </section>
+
+  <section>
+    <h2>Account</h2>
+    <div class="row">
+      <span class="muted">Timezone: <span id="tzLabel"></span></span>
+      <button class="ghost small" onclick="syncTimezone()">Use this device's timezone</button>
+      <button class="ghost small danger" onclick="deleteAccount()">Delete account & data</button>
+    </div>
+  </section>
+</div>
+
+<footer class="muted">Built with FastAPI, PostgreSQL and Claude · <a href="/docs">API docs</a></footer>
+</div>
+<div id="toast" role="status"></div>
 
 <script>
-async function setupNotif(){
-  const topic = document.getElementById('topic').value;
-  await fetch(`/setup/notifications?topic=${encodeURIComponent(topic)}`, {method:'POST'});
-  alert('Connected. Check your device for a test notification.');
+const $ = id => document.getElementById(id);
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+let me = null, authMode = 'login';
+
+// Escape everything user-controlled before it touches innerHTML.
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3500);
 }
-async function addGoal(){
-  const title = document.getElementById('goalTitle').value;
-  const deadline = document.getElementById('goalDeadline').value || null;
-  const auto_decompose = document.getElementById('autoDecompose').checked;
-  await fetch('/goals', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({title, deadline, auto_decompose})});
-  loadGoals();
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    method: opts.method || 'GET',
+    headers: opts.body ? {'Content-Type': 'application/json'} : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    credentials: 'same-origin',
+  });
+  let data = null;
+  try { data = await res.json(); } catch (_) {}
+  if (res.status === 401 && !path.startsWith('/auth/')) { showAuth(); throw new Error('Please log in.'); }
+  if (!res.ok) {
+    let d = data && data.detail;
+    if (Array.isArray(d)) d = d.map(e => (e.loc ? e.loc.slice(-1)[0] + ': ' : '') + e.msg).join('; ');
+    throw new Error(d || `Request failed (${res.status})`);
+  }
+  return data;
 }
-async function loadGoals(){
-  const res = await fetch('/goals'); const goals = await res.json();
-  document.getElementById('goalList').innerHTML = goals.map(g =>
-    `<li>${g.title} — ${g.progress_pct}% (${g.done}/${g.total} tasks)</li>`).join('');
+const run = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message); } };
+
+// ---------- auth ----------
+function setTab(mode) {
+  authMode = mode;
+  $('tabLogin').classList.toggle('on', mode === 'login');
+  $('tabSignup').classList.toggle('on', mode === 'signup');
+  $('authName').hidden = mode !== 'signup';
+  $('authBtn').textContent = mode === 'signup' ? 'Create account' : 'Log in';
+  $('authPassword').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  $('authErr').textContent = '';
 }
-async function addCal(){
-  const date = document.getElementById('calDate').value;
-  const start_time = document.getElementById('calStart').value;
-  const end_time = document.getElementById('calEnd').value;
-  const title = document.getElementById('calTitle').value;
-  await fetch('/calendar', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({date, start_time, end_time, title})});
-  alert('Added');
+async function submitAuth(e) {
+  e.preventDefault();
+  $('authErr').textContent = ''; $('authBtn').disabled = true;
+  try {
+    const body = {email: $('authEmail').value, password: $('authPassword').value};
+    if (authMode === 'signup') Object.assign(body, {name: $('authName').value, timezone: TZ});
+    me = await api('/auth/' + authMode, {method: 'POST', body});
+    $('authPassword').value = '';
+    showApp();
+  } catch (err) { $('authErr').textContent = err.message; }
+  finally { $('authBtn').disabled = false; }
 }
-async function generatePlan(){
-  await fetch('/plan/generate', {method:'POST'});
+async function startDemo() {
+  try {
+    me = await api('/auth/demo', {method: 'POST', body: {timezone: TZ}});
+    await api('/plan/generate', {method: 'POST'});
+    showApp();
+  } catch (err) { $('authErr').textContent = err.message; }
+}
+const logout = run(async () => { await api('/auth/logout', {method: 'POST'}); me = null; showAuth(); });
+const deleteAccount = run(async () => {
+  if (!confirm('Delete your account and all your goals, tasks and plans? This cannot be undone.')) return;
+  await api('/auth/me', {method: 'DELETE'}); me = null; showAuth(); toast('Account deleted.');
+});
+const syncTimezone = run(async () => { me = await api('/auth/me', {method: 'PATCH', body: {timezone: TZ}}); renderMe(); toast('Timezone set to ' + TZ); refreshAll(); });
+
+function showAuth() { $('appView').hidden = true; $('authView').hidden = false; }
+function showApp() { $('authView').hidden = true; $('appView').hidden = false; renderMe(); refreshAll(); }
+function renderMe() {
+  $('whoami').textContent = me.is_guest ? 'Guest' : (me.name || me.email);
+  $('guestBanner').hidden = !me.is_guest;
+  $('tzLabel').textContent = me.timezone;
+  $('aiLeft').textContent = me.ai_daily_limit ? `(${me.ai_calls_left_today}/${me.ai_daily_limit} left today)` : '(AI off: uses a template)';
+  $('notifStatus').textContent = me.notifications_connected ? 'Connected. You will get morning plans and risk alerts.' : 'Not connected.';
+  $('disconnectBtn').hidden = !me.notifications_connected;
+}
+async function refreshMe() { me = await api('/auth/me'); renderMe(); }
+function refreshAll() { loadPlan(); loadGoals(); loadCal(); }
+
+// ---------- plan ----------
+const loadPlan = run(async () => {
+  const [items, cap] = await Promise.all([api('/plan'), api('/capacity')]);
+  $('capacity').textContent = `${Math.floor(cap.free_minutes / 60)}h ${cap.free_minutes % 60}m free left today`;
+  $('planList').innerHTML = items.length ? items.map(i => {
+    const done = i.task_status === 'done';
+    return `<li class="${done ? 'done' : ''}">
+      <span class="time">${esc(i.start)}–${esc(i.end)}</span>
+      <span class="title">${esc(i.task)}</span>
+      <span class="chip ${esc(i.energy)}">${esc(i.energy)}</span>
+      ${done ? '<span class="chip okc">done</span>' : `
+        <button class="small" onclick="markDone(${i.task_id})">Done</button>
+        <button class="small ghost" onclick="skipTask(${i.task_id})">Skip</button>`}
+    </li>`;
+  }).join('') : '<li class="muted">No plan yet. Add goals or tasks, then Generate plan.</li>';
+});
+const generatePlan = run(async (btn) => {
+  btn.disabled = true;
+  try { const r = await api('/plan/generate', {method: 'POST'}); toast(`Scheduled ${r.scheduled} block(s).`); await loadPlan(); }
+  finally { btn.disabled = false; }
+});
+const markDone = run(async (id) => {
+  const mins = prompt('How many minutes did it actually take? (helps future estimates; leave blank to skip)');
+  const body = {status: 'done'};
+  if (mins && +mins > 0) body.actual_minutes = Math.round(+mins);
+  await api(`/tasks/${id}`, {method: 'PATCH', body});
+  loadPlan(); loadGoals();
+});
+const skipTask = run(async (id) => {
+  await api(`/tasks/${id}`, {method: 'PATCH', body: {status: 'skipped'}});
+  toast('Skipped. Replanned today and tomorrow; it will rank higher next time.');
   loadPlan();
-}
-async function loadPlan(){
-  const res = await fetch('/plan'); const items = await res.json();
-  document.getElementById('planList').innerHTML = items.map(i =>
-    `<li>${i.start}–${i.end}: ${i.task}</li>`).join('') || '<li class="muted">No plan yet</li>';
-}
-async function whatNow(){
-  const free_minutes = parseInt(document.getElementById('freeMin').value);
-  const energy = document.getElementById('energy').value;
-  const res = await fetch('/what-now', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({free_minutes, energy})});
-  const data = await res.json();
-  document.getElementById('whatNowResult').innerText = data.task
-    ? `→ ${data.task} (~${data.estimated_minutes} min)` : data.message;
-}
-loadGoals(); loadPlan();
+});
+
+// ---------- what now ----------
+const whatNow = run(async () => {
+  const d = await api('/what-now', {method: 'POST', body: {free_minutes: parseInt($('freeMin').value) || 30, energy: $('energy').value}});
+  $('whatNowResult').textContent = d.task ? `→ ${d.task} (~${d.estimated_minutes} min)` : d.message;
+});
+
+// ---------- goals ----------
+const loadGoals = run(async () => {
+  const goals = await api('/goals');
+  if (!goals.length) { $('goalList').innerHTML = '<li class="muted">No goals yet.</li>'; return; }
+  const tasks = await api('/tasks');
+  $('goalList').innerHTML = goals.map(g => {
+    const gt = tasks.filter(t => t.goal_id === g.id);
+    const risk = g.risk ? `<span class="chip ${g.risk.at_risk ? 'risk' : 'okc'}" title="${esc(g.risk.detail)}">${g.risk.at_risk ? 'at risk' : 'on track'}</span>` : '';
+    return `<li>
+      <span class="title"><strong>${esc(g.title)}</strong>${g.deadline ? ` <span class="muted">· due ${esc(g.deadline)}</span>` : ''}</span>
+      ${risk}<span class="chip">${g.done}/${g.total} tasks</span>
+      <button class="small ghost danger" onclick="deleteGoal(${g.id})" aria-label="delete goal">✕</button>
+      <div class="bar"><span style="width:${+g.progress_pct}%"></span></div>
+      ${g.risk && g.risk.at_risk ? `<div class="muted" style="flex-basis:100%">${esc(g.risk.detail)}</div>` : ''}
+      <details style="flex-basis:100%"><summary>Tasks</summary><ul>${gt.map(t => `
+        <li class="${t.status === 'done' ? 'done' : ''}"><span class="title">${esc(t.title)}</span>
+          <span class="chip">${t.estimated_minutes}m</span><span class="chip ${esc(t.energy_required)}">${esc(t.energy_required)}</span>
+          <span class="chip">P${t.priority}</span></li>`).join('') || '<li class="muted">No tasks</li>'}
+      </ul></details>
+    </li>`;
+  }).join('');
+});
+const addGoal = run(async (e) => {
+  e.preventDefault();
+  const btn = $('goalBtn'), auto = $('autoDecompose').checked;
+  btn.disabled = true; btn.textContent = auto ? 'Breaking down…' : 'Adding…';
+  try {
+    const r = await api('/goals', {method: 'POST', body: {title: $('goalTitle').value, deadline: $('goalDeadline').value || null, auto_decompose: auto}});
+    $('goalTitle').value = '';
+    if (auto) toast(r.note ? `${r.note} Created ${r.tasks_created} tasks.` : `AI created ${r.tasks_created} tasks.`);
+    await Promise.all([loadGoals(), refreshMe()]);
+  } finally { btn.disabled = false; btn.textContent = 'Add goal'; }
+});
+const deleteGoal = run(async (id) => {
+  if (!confirm('Delete this goal and its tasks?')) return;
+  await api(`/goals/${id}`, {method: 'DELETE'}); loadGoals(); loadPlan();
+});
+
+// ---------- calendar ----------
+const loadCal = run(async () => {
+  const blocks = await api('/calendar');
+  $('calList').innerHTML = blocks.map(b => `<li><span class="time">${esc(b.start)}–${esc(b.end)}</span>
+    <span class="title">${esc(b.title)}</span>
+    <button class="small ghost danger" onclick="deleteCal(${b.id})" aria-label="delete">✕</button></li>`).join('')
+    || '<li class="muted">Nothing blocked today.</li>';
+});
+const addCal = run(async (e) => {
+  e.preventDefault();
+  // "today" in the account's timezone, matching what the server plans for
+  const date = new Intl.DateTimeFormat('en-CA', {timeZone: me.timezone}).format(new Date());
+  await api('/calendar', {method: 'POST', body: {date, start_time: $('calStart').value, end_time: $('calEnd').value, title: $('calTitle').value || 'Busy'}});
+  $('calTitle').value = ''; loadCal(); loadPlan();
+});
+const deleteCal = run(async (id) => { await api(`/calendar/${id}`, {method: 'DELETE'}); loadCal(); loadPlan(); });
+
+// ---------- notifications ----------
+const setupNotif = run(async (e) => {
+  e.preventDefault();
+  await api('/setup/notifications', {method: 'POST', body: {topic: $('topic').value}});
+  toast('Connected. Check your devices for a test notification.'); refreshMe();
+});
+const disconnectNotif = run(async () => { await api('/setup/notifications', {method: 'DELETE'}); refreshMe(); });
+
+// ---------- boot ----------
+(async () => {
+  try { me = await api('/auth/me'); showApp(); } catch (_) { showAuth(); }
+})();
 </script>
 </body>
 </html>

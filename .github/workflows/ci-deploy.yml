@@ -1,0 +1,74 @@
+name: Test & deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}   # set under Settings → Variables → Actions
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: planner
+          POSTGRES_PASSWORD: planner
+          POSTGRES_DB: plannertest
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    strategy:
+      matrix:
+        db: [sqlite, postgres]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Run tests (${{ matrix.db }})
+        env:
+          TEST_DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql://planner:planner@localhost:5432/plannertest' || '' }}
+        run: |
+          if [ -z "$TEST_DATABASE_URL" ]; then unset TEST_DATABASE_URL; fi
+          pytest -q
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package only what the server needs
+        run: |
+          mkdir deploy
+          cp -r app requirements.txt deploy/
+          find deploy -name "__pycache__" -type d -prune -exec rm -rf {} +
+      - name: Deploy to Azure App Service
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy
+      - name: Smoke test
+        run: |
+          url="${{ steps.deploy.outputs.webapp-url }}"
+          for i in $(seq 1 20); do
+            if curl -fsS "$url/healthz"; then echo; echo "healthy"; exit 0; fi
+            echo "waiting for app to start ($i)..."; sleep 15
+          done
+          echo "app did not become healthy"; exit 1

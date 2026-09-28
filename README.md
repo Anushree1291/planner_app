@@ -1,144 +1,105 @@
-# AI Execution Planner — MVP
+# AI Execution Planner
 
-Implements Phase 1 + Phase 2 from the brainstorm:
-- Goals → tasks (optionally AI-decomposed via Claude)
-- Calendar-aware capacity calculation (`free_minutes today`)
-- Energy-aware, urgency-sorted daily plan generation (won't jam 8 tasks into a 3-hour day)
-- Automatic task splitting when a task doesn't fit a free slot
-- "What should I do now?" endpoint
-- Skip/postpone → automatic replan, with postponed tasks surfacing higher next time
-- Learned time-estimation (actual vs estimated minutes adjust future scheduling)
-- Goal risk detection (background job flags goals that need >3h/day to hit deadline)
-- Push notifications to phone + laptop via ntfy.sh (no accounts/keys needed)
+**Live demo:** https://YOUR-APP.azurewebsites.net &nbsp;·&nbsp; click **Try the demo**, no signup needed
 
-## 1. Run it locally
+Most to-do apps let you pile 14 tasks onto a 6-hour day. This planner does something different. It
+turns goals into tasks (optionally using Claude), works out how much free time you actually have
+around your calendar, and builds a realistic, energy-aware schedule. When you skip something, it
+replans on its own.
+
+![CI](https://github.com/YOUR-USERNAME/planner-app/actions/workflows/ci-deploy.yml/badge.svg)
+
+## Features
+
+- **AI goal decomposition.** "Learn GenAI in 3 months" becomes 8–15 scheduled tasks with effort,
+  priority and energy estimates (Claude API). Calls are metered per user per day and globally, and
+  it falls back to a template when a limit is hit or the API fails.
+- **Calendar-aware capacity.** Your busy blocks are subtracted from the day, and time that has
+  already passed today is excluded.
+- **Energy-aware greedy scheduler.** High-focus work goes in the morning and low-energy work in the
+  evening, sorted by urgency (priority, deadline proximity, how often a task was postponed). Large
+  tasks are split across free slots, and dependencies are respected.
+- **Automatic replanning.** Skipping a task bumps its urgency and regenerates today's and
+  tomorrow's plans.
+- **Learns your estimates.** An exponential moving average of actual vs. estimated time scales future plans.
+- **Goal risk detection.** Flags goals that would need more than 3 h/day to hit their deadline.
+- **Push notifications** to phone and laptop via ntfy: a morning plan and evening risk alerts, sent
+  at the right time in *each user's own timezone*.
+- **Multi-user.** Email/password accounts (bcrypt, signed httpOnly session cookie), strict per-user
+  data isolation, one-click guest sandboxes that are deleted after 24 h, and account deletion.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  U[Browser / phone] -->|HTTPS| W[FastAPI on Azure App Service]
+  W --> DB[(Neon Postgres)]
+  W -->|rate-limited| AI[Claude API]
+  W --> N[ntfy.sh push]
+  T[Azure Function timer, hourly] -->|POST /internal/cron/hourly + secret| W
+  G[GitHub Actions] -->|tests on SQLite + Postgres, then deploy| W
+```
+
+| Module | Responsibility |
+|---|---|
+| `app/planner.py` | Scheduling engine: capacity, energy windows, urgency scoring, task splitting, replanning, risk |
+| `app/ai_decompose.py` | Claude prompt, output validation/sanitising, per-user and global daily metering, fallback |
+| `app/auth.py` | Signup/login/demo, bcrypt, session cookie, IP rate limiting, timezone helpers |
+| `app/jobs.py` | Idempotent hourly job: per-timezone morning plan and risk alerts, guest cleanup |
+| `app/main.py` | REST API (OpenAPI docs at `/docs`), ownership checks, quotas, security headers |
+| `azure_function/` | Timer trigger that wakes the (free-tier, sleeping) web app every hour |
+
+**Design decisions**
+
+- **External timer instead of an in-process scheduler.** Free-tier web apps sleep, and multiple
+  workers would duplicate jobs. A single hourly tick plus `last_*_run` dates makes the jobs
+  idempotent and timezone-correct.
+- **AI cost control.** Usage is reserved before the API call so parallel requests can't exceed the
+  cap, and it's refunded if the call fails. The model's output is treated as untrusted and
+  clamped/validated.
+- **Security.** Every row lookup is scoped to the session user (404 rather than 403, so other
+  users' IDs are never confirmed). Output in the dashboard is HTML-escaped. There are SameSite
+  cookies, login/signup rate limits, and per-user row quotas so a free database can't be filled up.
+
+## Run locally
 
 ```bash
-cd planner_app
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+cp .env.example .env        # optional: add ANTHROPIC_API_KEY
 uvicorn app.main:app --reload
 ```
 
-Open **http://localhost:8000** — a minimal dashboard to add goals, add calendar
-blocks, generate today's plan, and try "what now".
+Open http://localhost:8000. Data goes into a local `planner.db` SQLite file. Locally, the hourly
+job runs inside the app, so there's nothing else to set up.
 
-Data is stored in a local `planner.db` SQLite file by default.
+With Docker instead: `docker build -t planner . && docker run -p 8000:8000 planner`
 
-Optional: set `ANTHROPIC_API_KEY` as an environment variable to enable
-AI goal decomposition (`auto_decompose: true` when creating a goal breaks
-"Learn GenAI in 3 months" into ~10 concrete tasks automatically).
+## Tests
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+pytest -q                                              # SQLite
+TEST_DATABASE_URL=postgresql://user:pw@localhost/test pytest -q   # Postgres
 ```
 
-## 2. Notifications on phone + laptop (no app store, no VAPID keys)
+20 tests cover auth, cross-user isolation, AI limits and fallback, the scheduler, input validation,
+cron auth and idempotency. CI runs them against both SQLite and Postgres on every push.
 
-This uses **ntfy.sh**, a free open-source push notification service built
-exactly for this kind of thing (self-hostable later if you want).
+## Deploy
 
-1. Pick a hard-to-guess topic name, e.g. `raj-planner-9f21ac` (treat it like a password — anyone who knows it can read your notifications).
-2. **Phone:** install the "ntfy" app (iOS App Store / Google Play) → add subscription → paste your topic name.
-3. **Laptop:** open `https://ntfy.sh/your-topic-name` in a browser and click "Enable notifications" (or install the ntfy desktop app for Mac/Windows/Linux).
-4. Tell the planner about your topic:
-   ```bash
-   curl -X POST "http://localhost:8000/setup/notifications?topic=raj-planner-9f21ac"
-   ```
-   (or use the "Connect" box in the dashboard UI)
-5. You'll immediately get a test notification on both devices.
+See **[docs/DEPLOY_AZURE.md](docs/DEPLOY_AZURE.md)**: App Service (free tier) + Neon Postgres +
+an Azure Functions timer, with GitHub Actions deploying on every push to `main`.
 
-From then on you'll get pushed:
-- Your daily plan every morning at 7:00 AM (edit the hour in `app/scheduler.py`)
-- A "time to focus" nudge whenever you call `/what-now`
-- Goal risk warnings at 8:00 PM if a goal needs an unrealistic daily pace
+## Notifications (ntfy)
 
-If you'd rather not rely on the public ntfy.sh server long-term, you can
-self-host ntfy in ~5 minutes (single Docker container) — see https://docs.ntfy.sh/install/.
-An alternative that also works well: a Telegram bot (`sendMessage` via
-`api.telegram.org`) if you'd rather use an app you already have installed.
+1. Pick a hard-to-guess topic, e.g. `anu-planner-9f21ac`. Anyone who knows it can read your pushes.
+2. Phone: install the **ntfy** app and subscribe to the topic. Laptop: open `https://ntfy.sh/<topic>`
+   and enable notifications.
+3. Enter the topic in the dashboard's *Notifications* box. A test push arrives immediately.
 
-## 3. Deploying to Azure
+## Roadmap
 
-Recommended setup: **Azure Container Apps** (serverless containers, scales
-to zero, cheap for a personal tool) + **Azure Database for PostgreSQL
-Flexible Server** (so state survives restarts/redeploys — SQLite won't
-persist reliably in a container).
-
-### Step 1 — Create a Postgres database
-```bash
-az postgres flexible-server create \
-  --resource-group my-planner-rg \
-  --name my-planner-db \
-  --location eastus \
-  --admin-user plannerAdmin \
-  --admin-password "<STRONG_PASSWORD>" \
-  --sku-name Standard_B1ms \
-  --tier Burstable \
-  --storage-size 32 \
-  --version 15
-
-az postgres flexible-server db create \
-  --resource-group my-planner-rg \
-  --server-name my-planner-db \
-  --database-name plannerdb
-```
-Allow your Container App to reach it (or use the "Allow Azure services" firewall rule).
-
-### Step 2 — Build & push the container image
-```bash
-az acr create --resource-group my-planner-rg --name myplanneracr --sku Basic
-az acr build --registry myplanneracr --image planner:latest .
-```
-
-### Step 3 — Deploy to Container Apps
-```bash
-az containerapp env create \
-  --name planner-env \
-  --resource-group my-planner-rg \
-  --location eastus
-
-az containerapp create \
-  --name planner-app \
-  --resource-group my-planner-rg \
-  --environment planner-env \
-  --image myplanneracr.azurecr.io/planner:latest \
-  --target-port 8000 \
-  --ingress external \
-  --registry-server myplanneracr.azurecr.io \
-  --min-replicas 1 --max-replicas 1 \
-  --env-vars \
-    DATABASE_URL="postgresql://plannerAdmin:<PASSWORD>@my-planner-db.postgres.database.azure.com:5432/plannerdb?sslmode=require" \
-    ANTHROPIC_API_KEY="<your key, optional>"
-```
-
-That gives you a public HTTPS URL. Open it from your phone's browser and
-"Add to Home Screen" for an app-like icon — the built-in dashboard is a
-normal web page so this works without any native app development.
-
-**Cost note:** `min-replicas 1` keeps one instance always warm so the
-background scheduler (morning plan + risk checks) actually fires. If you set
-`min-replicas 0` to save money, the container sleeps and scheduled jobs won't
-run until a request wakes it — in that case, trigger `/plan/generate` from
-an **Azure Function on a Timer Trigger** instead (calls your app's URL every
-morning), which is essentially free at this scale.
-
-### Alternative: Azure App Service
-If you'd rather not deal with containers at all:
-```bash
-az webapp up --resource-group my-planner-rg --name my-planner-app \
-  --runtime "PYTHON:3.11" --sku B1
-```
-Then set `DATABASE_URL` and `ANTHROPIC_API_KEY` under
-Configuration → Application settings in the Azure Portal. App Service
-supports "Always On" (paid tiers) to keep the scheduler alive the same way
-`min-replicas 1` does for Container Apps.
-
-## 4. What's not built yet (roadmap, matching the original phases)
-
-- Real Google/Outlook calendar sync (currently manual calendar blocks) — Phase 4
-- Multi-goal conflict resolution, weekly review agent, focus-mode timer — Phase 2/3 extensions
-- Multi-user auth (currently single hardcoded user) — needed before sharing this with anyone else
-- Planner→Evaluator→Replan critique loop (currently replanning is a fixed heuristic, not an LLM critic)
-
-The architecture (separate `planner.py` engine, `ai_decompose.py`, `notifications.py`)
-is deliberately modular so each of these can be added without rewriting the core.
+- Google/Outlook calendar sync (OAuth) in place of manual busy blocks
+- Alembic migrations (the schema is currently created with `create_all`)
+- Weekly review agent, and a planner → evaluator → replan loop with an LLM critic
+- Focus-mode timer, drag-to-reschedule UI

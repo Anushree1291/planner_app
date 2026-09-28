@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "PLANNER_URL": "http://localhost:8000",
+    "CRON_SECRET": "same-as-the-web-app"
+  }
+}
