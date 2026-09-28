@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>AI Execution Planner</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 720px; margin: 40px auto; background:#0f1117; color:#e6e6e6; }
+  h1 { font-size: 20px; }
+  section { background:#181b24; border-radius:10px; padding:16px; margin-bottom:16px; }
+  input, button, select { padding:8px; border-radius:6px; border:1px solid #333; background:#0f1117; color:#eee; margin:4px 4px 4px 0; }
+  button { cursor:pointer; background:#3b6ef5; border:none; }
+  li { margin-bottom:6px; }
+  .muted { color:#999; font-size:13px; }
+</style>
+</head>
+<body>
+<h1>🧠 AI Execution Planner</h1>
+
+<section>
+  <h3>1. Connect notifications</h3>
+  <input id="topic" placeholder="pick a secret ntfy topic e.g. mypersonal-planner-8823" style="width:320px" />
+  <button onclick="setupNotif()">Connect</button>
+  <p class="muted">Subscribe to the same topic in the ntfy app (phone) and at ntfy.sh (laptop browser). See README.</p>
+</section>
+
+<section>
+  <h3>2. Add a goal</h3>
+  <input id="goalTitle" placeholder="Goal title" style="width:300px" />
+  <input id="goalDeadline" type="date" />
+  <label><input type="checkbox" id="autoDecompose" /> auto-decompose with AI</label>
+  <button onclick="addGoal()">Add Goal</button>
+  <ul id="goalList"></ul>
+</section>
+
+<section>
+  <h3>3. Add a calendar block (busy time)</h3>
+  <input id="calDate" type="date" />
+  <input id="calStart" placeholder="09:00" style="width:70px" />
+  <input id="calEnd" placeholder="10:00" style="width:70px" />
+  <input id="calTitle" placeholder="Meeting" />
+  <button onclick="addCal()">Add</button>
+</section>
+
+<section>
+  <h3>4. Today's plan</h3>
+  <button onclick="generatePlan()">Generate Plan</button>
+  <button onclick="loadPlan()">Refresh</button>
+  <ul id="planList"></ul>
+</section>
+
+<section>
+  <h3>5. What should I do now?</h3>
+  <input id="freeMin" type="number" placeholder="minutes free" style="width:120px" value="30" />
+  <select id="energy"><option>high</option><option selected>medium</option><option>low</option></select>
+  <button onclick="whatNow()">Ask</button>
+  <p id="whatNowResult"></p>
+</section>
+
+<script>
+async function setupNotif(){
+  const topic = document.getElementById('topic').value;
+  await fetch(`/setup/notifications?topic=${encodeURIComponent(topic)}`, {method:'POST'});
+  alert('Connected. Check your device for a test notification.');
+}
+async function addGoal(){
+  const title = document.getElementById('goalTitle').value;
+  const deadline = document.getElementById('goalDeadline').value || null;
+  const auto_decompose = document.getElementById('autoDecompose').checked;
+  await fetch('/goals', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({title, deadline, auto_decompose})});
+  loadGoals();
+}
+async function loadGoals(){
+  const res = await fetch('/goals'); const goals = await res.json();
+  document.getElementById('goalList').innerHTML = goals.map(g =>
+    `<li>${g.title} — ${g.progress_pct}% (${g.done}/${g.total} tasks)</li>`).join('');
+}
+async function addCal(){
+  const date = document.getElementById('calDate').value;
+  const start_time = document.getElementById('calStart').value;
+  const end_time = document.getElementById('calEnd').value;
+  const title = document.getElementById('calTitle').value;
+  await fetch('/calendar', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({date, start_time, end_time, title})});
+  alert('Added');
+}
+async function generatePlan(){
+  await fetch('/plan/generate', {method:'POST'});
+  loadPlan();
+}
+async function loadPlan(){
+  const res = await fetch('/plan'); const items = await res.json();
+  document.getElementById('planList').innerHTML = items.map(i =>
+    `<li>${i.start}–${i.end}: ${i.task}</li>`).join('') || '<li class="muted">No plan yet</li>';
+}
+async function whatNow(){
+  const free_minutes = parseInt(document.getElementById('freeMin').value);
+  const energy = document.getElementById('energy').value;
+  const res = await fetch('/what-now', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({free_minutes, energy})});
+  const data = await res.json();
+  document.getElementById('whatNowResult').innerText = data.task
+    ? `→ ${data.task} (~${data.estimated_minutes} min)` : data.message;
+}
+loadGoals(); loadPlan();
+</script>
+</body>
+</html>
