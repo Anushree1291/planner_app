@@ -87,7 +87,7 @@ cron auth and idempotency. CI runs them against both SQLite and Postgres on ever
 
 ## Deploy
 
-See **[docs/DEPLOY_AZURE.md](docs/DEPLOY_AZURE.md)**: App Service (free tier) + Neon Postgres +
+Two ways, both in `docs/`: **[DEPLOY_AZURE_PORTAL.md](docs/DEPLOY_AZURE_PORTAL.md)** (Azure portal + Azure DevOps Pipelines, `azure-pipelines.yml`) or **[DEPLOY_AZURE.md](docs/DEPLOY_AZURE.md)**: App Service (free tier) + Neon Postgres +
 an Azure Functions timer, with GitHub Actions deploying on every push to `main`.
 
 ## Notifications (ntfy)

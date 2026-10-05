@@ -45,7 +45,9 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # Skipped unless you set the AZURE_WEBAPP_NAME variable, so it won't clash if you
+    # deploy with Azure DevOps (azure-pipelines.yml) instead.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AZURE_WEBAPP_NAME != ''
     runs-on: ubuntu-latest
     environment:
       name: production
