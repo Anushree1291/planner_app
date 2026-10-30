@@ -11,7 +11,7 @@ pr: none
 
 variables:
   azureServiceConnection: 'azure-planner-connection'   # Project settings → Service connections
-  webAppName: 'anushree-planner'                       # your App Service name
+  webAppName: 'ai-planner-c9gre3hghub9g3av.centralindia-01'             # your App Service name
   pythonVersion: '3.11'
   vmImageName: 'ubuntu-latest'
 
