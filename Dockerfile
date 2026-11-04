@@ -1,5 +1,5 @@
 # Optional: run the app as a container (local testing, or Azure Container Apps later).
-# The default Azure path in docs/DEPLOY_AZURE.md deploys the code directly to App Service.
+# The default Azure path deploys the code directly to App Service.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1

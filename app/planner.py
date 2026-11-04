@@ -29,8 +29,9 @@ def free_slots_for_day(db: Session, user_id: int, date: dt.date,
     """Return free (start_min, end_min) windows for the day after subtracting
     calendar blocks. `not_before` (minutes since midnight) drops time that has
     already passed when planning for today. Stands in for real calendar sync (Phase 4)."""
-    blocks = db.query(models.CalendarBlock).filter_by(user_id=user_id, date=date).all()
-    busy = sorted([(_to_minutes(b.start_time), _to_minutes(b.end_time)) for b in blocks])
+    from .routines import busy_blocks   # one-off blocks + routines that apply that day
+    busy = sorted([(_to_minutes(b["start"]), _to_minutes(b["end"]))
+                   for b in busy_blocks(db, user_id, date)])
 
     start, end = _to_minutes(day_start), _to_minutes(day_end)
     if not_before is not None:
@@ -54,6 +55,31 @@ def calculate_capacity(db: Session, user_id: int, date: dt.date,
     return sum(e - s for s, e in free_slots_for_day(db, user_id, date, not_before=not_before))
 
 
+WINDOWS = {"morning": (6 * 60, 12 * 60), "afternoon": (12 * 60, 17 * 60), "evening": (17 * 60, 24 * 60)}
+
+
+def _window_at(minute: int) -> str:
+    return "morning" if minute < 12 * 60 else "afternoon" if minute < 17 * 60 else "evening"
+
+
+def materialize_recurring(db: Session, user_id: int, date: dt.date):
+    """Habits and workouts repeat: make today's copy of each, and let missed copies from
+    earlier days lapse instead of piling up."""
+    db.query(models.Task).filter(models.Task.user_id == user_id, models.Task.recurring_id.isnot(None),
+                                 models.Task.status == "pending", models.Task.deadline < date) \
+      .update({models.Task.status: "missed"}, synchronize_session=False)
+    for r in db.query(models.Recurring).filter_by(user_id=user_id).all():
+        days = [int(x) for x in (r.weekdays or "").split(",") if x.strip().isdigit()]
+        if date.weekday() not in days:
+            continue
+        exists = db.query(models.Task).filter_by(user_id=user_id, recurring_id=r.id, deadline=date).first()
+        if not exists:
+            db.add(models.Task(user_id=user_id, goal_id=r.goal_id, title=r.title,
+                               estimated_minutes=r.minutes, energy_required=r.energy, priority=4,
+                               deadline=date, recurring_id=r.id, preferred_window=r.preferred_window))
+    db.commit()
+
+
 def _energy_at(minute: int) -> str:
     hour = minute // 60
     for level, windows in ENERGY_WINDOWS.items():
@@ -75,8 +101,13 @@ def _urgency_score(task: models.Task, today: dt.date) -> float:
     return score
 
 
-def _pending_ready_tasks(db: Session, user_id: int) -> list[models.Task]:
+def _pending_ready_tasks(db: Session, user_id: int, for_date: dt.date | None = None) -> list[models.Task]:
     tasks = db.query(models.Task).filter_by(user_id=user_id, status="pending").all()
+    # a habit's copy for another day isn't for today
+    if for_date:
+        tasks = [t for t in tasks
+                 if not (t.recurring_id and t.deadline and t.deadline != for_date)
+                 and (not t.allowed_days or str(for_date.weekday()) in t.allowed_days.split(","))]
     done_ids = {tid for (tid,) in db.query(models.Task.id)
                 .filter_by(user_id=user_id, status="done").all()}
     all_ids = {tid for (tid,) in db.query(models.Task.id).filter_by(user_id=user_id).all()}
@@ -94,12 +125,16 @@ def generate_daily_plan(db: Session, user_id: int, date: dt.date,
           .delete(synchronize_session=False)
         db.commit()
 
+    from .routines import day_status, LIGHT_DAY_MINUTES
+    materialize_recurring(db, user_id, date)
     profile = db.query(models.UserProfile).filter_by(user_id=user_id).first()
     overrun = profile.avg_overrun_factor if profile else 1.0
     min_chunk = profile.preferred_session_min if profile else 30
+    # a busy day ("keep it light") gets only a little planned, most urgent first
+    budget = LIGHT_DAY_MINUTES if day_status(db, user_id, date) == "light" else None
 
     slots = free_slots_for_day(db, user_id, date, not_before=not_before)
-    tasks = _pending_ready_tasks(db, user_id)
+    tasks = _pending_ready_tasks(db, user_id, for_date=date)
     tasks.sort(key=lambda t: _urgency_score(t, date), reverse=True)
     # minutes still to schedule per task, tracked locally so regenerating a plan
     # never mutates the stored estimates
@@ -109,13 +144,29 @@ def generate_daily_plan(db: Session, user_id: int, date: dt.date,
     for slot_start, slot_end in slots:
         cursor = slot_start
         while cursor < slot_end and tasks:
-            window_energy = _energy_at(cursor)
-            # prefer a task matching this window's energy; else take the most urgent
-            candidates = [t for t in tasks if t.energy_required == window_energy] or tasks
+            if budget is not None and budget <= 0:
+                break
+            window_energy, window = _energy_at(cursor), _window_at(cursor)
+            # tasks that want another part of the day wait for it, unless nothing else fits
+            fits_window = [t for t in tasks if not t.preferred_window or t.preferred_window == window]
+            pool = fits_window or tasks
+            # prefer: asked for this window > matches this window's energy > most urgent
+            candidates = ([t for t in pool if t.preferred_window == window]
+                          or [t for t in pool if t.energy_required == window_energy] or pool)
             task = candidates[0]
+            if not fits_window and task.preferred_window:
+                # everything left wants a later window: jump there if it's in this slot
+                start = WINDOWS[task.preferred_window][0]
+                if cursor < start < slot_end:
+                    cursor = start
+                    continue
+                if start >= slot_end:
+                    break           # wait for a later free slot
 
             need = remaining[task.id]
             available = slot_end - cursor
+            if budget is not None:
+                available = min(available, budget)
             if need <= available:
                 chunk = need
             elif available >= min_chunk:
@@ -128,6 +179,8 @@ def generate_daily_plan(db: Session, user_id: int, date: dt.date,
             db.add(item)
             plan_items.append(item)
             cursor += chunk
+            if budget is not None:
+                budget -= chunk
 
             if chunk < need:
                 remaining[task.id] = need - chunk
@@ -144,7 +197,8 @@ def generate_daily_plan(db: Session, user_id: int, date: dt.date,
 
 def what_should_i_do_now(db: Session, user_id: int, free_minutes: int, energy: str,
                          today: dt.date):
-    tasks = _pending_ready_tasks(db, user_id)
+    materialize_recurring(db, user_id, today)
+    tasks = _pending_ready_tasks(db, user_id, for_date=today)
     # must fit in the time available
     fitting = [t for t in tasks if t.estimated_minutes <= free_minutes] or tasks
     # prefer matching energy, then urgency
@@ -161,7 +215,9 @@ def replan_after_miss(db: Session, user_id: int, task: models.Task, today: dt.da
     task.postponed_count += 1
     db.commit()
     generate_daily_plan(db, user_id, today, not_before=not_before)
-    generate_daily_plan(db, user_id, today + dt.timedelta(days=1))
+    user = db.get(models.User, user_id)
+    if not user or (user.day_pattern or "steady") == "steady":   # varying days: plan on the day
+        generate_daily_plan(db, user_id, today + dt.timedelta(days=1))
 
 
 def update_overrun_profile(db: Session, user_id: int, task: models.Task):

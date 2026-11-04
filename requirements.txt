@@ -10,3 +10,4 @@ python-dotenv==1.0.1
 bcrypt==4.2.0
 itsdangerous==2.2.0
 tzdata==2024.2
+azure-communication-email==1.1.0

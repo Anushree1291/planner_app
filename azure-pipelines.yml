@@ -1,7 +1,7 @@
 # Azure DevOps pipeline: test → package → deploy to Azure App Service.
 # Set up in the portal: see docs/DEPLOY_AZURE_PORTAL.md
 #
-# Edit the two values below to match what you created.
+# Edit the values below to match what you created.
 
 trigger:
   branches:
@@ -10,8 +10,10 @@ trigger:
 pr: none
 
 variables:
-  azureServiceConnection: 'azure-planner-connection'   # Project settings → Service connections
-  webAppName: 'ai-planner-c9gre3hghub9g3av.centralindia-01'             # your App Service name
+  azureServiceConnection: 'planner-azure-conn'         # Project settings → Service connections
+  webAppName: 'ai-planner'                             # your App Service *name*
+  # The full "Default domain" from the Web App's Overview page (no trailing slash)
+  webAppUrl: 'https://ai-planner-c9gre3hghub9g3av.centralindia-01.azurewebsites.net'
   pythonVersion: '3.11'
   vmImageName: 'ubuntu-latest'
 
@@ -90,7 +92,7 @@ stages:
               runtimeStack: 'PYTHON|3.11'
               startUpCommand: 'gunicorn -w 1 -k uvicorn.workers.UvicornWorker --timeout 120 --bind 0.0.0.0:8000 app.main:app'
           - script: |
-              url="https://$(webAppName).azurewebsites.net"
+              url="$(webAppUrl)"
               for i in $(seq 1 20); do
                 if curl -fsS "$url/healthz"; then echo; echo "healthy"; exit 0; fi
                 echo "waiting for app to start ($i)..."; sleep 15

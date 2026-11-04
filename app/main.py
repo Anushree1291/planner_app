@@ -1,5 +1,6 @@
 import datetime as dt
 import hmac
+import threading
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,11 +11,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import models, schemas, planner, notifications, ai_decompose, jobs, auth
+from . import models, schemas, planner, ai_decompose, jobs, auth, mailing, routines, goal_chat
 from .auth import current_user, user_now, user_today
 from .config import (SECRET_KEY, CRON_SECRET, IS_PROD, ENABLE_LOCAL_SCHEDULER,
                      MAX_GOALS_PER_USER, MAX_TASKS_PER_USER, MAX_BLOCKS_PER_USER)
-from .database import Base, engine, get_db
+from .database import Base, engine, get_db, add_missing_columns
 
 logging.basicConfig(level=logging.INFO)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -23,6 +24,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    add_missing_columns()
     if ENABLE_LOCAL_SCHEDULER:
         from .scheduler import start_scheduler, stop_scheduler
         start_scheduler()
@@ -36,13 +38,17 @@ app = FastAPI(title="AI Execution Planner", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="planner_session",
                    max_age=14 * 24 * 3600, same_site="lax", https_only=IS_PROD)
 app.include_router(auth.router)
+app.include_router(mailing.router)
+app.include_router(mailing.day_router)
+app.include_router(routines.router)
+app.include_router(goal_chat.router)
 
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     resp = await call_next(request)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
-    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")  # email preview iframe
     resp.headers.setdefault("Referrer-Policy", "same-origin")
     if IS_PROD:
         resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
@@ -84,33 +90,21 @@ def healthz(db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+_cron_lock = threading.Lock()
+
+
 @app.post("/internal/cron/hourly", include_in_schema=False)
 def cron_hourly(x_cron_secret: str = Header(default=""), db: Session = Depends(get_db)):
-    """Called once an hour by the Azure Function timer (see azure_function/)."""
+    """Called every 5 minutes by the Azure Function timer (see azure_function/).
+    The lock stops two runs overlapping, which could otherwise email someone twice."""
     if not CRON_SECRET or not hmac.compare_digest(x_cron_secret, CRON_SECRET):
         raise HTTPException(401, "bad cron secret")
-    return jobs.run_hourly(db)
-
-
-# ---------- Setup ----------
-
-@app.post("/setup/notifications")
-def setup_notifications(payload: schemas.NotificationSetup,
-                        user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    """Set your ntfy.sh topic once. See README for how to pick/subscribe to one."""
-    user.ntfy_topic = payload.topic
-    db.commit()
-    notifications.send_notification(payload.topic, "Connected",
-                                    "Your planner can now reach this device.")
-    return {"ok": True}
-
-
-@app.delete("/setup/notifications")
-def disconnect_notifications(user: models.User = Depends(current_user),
-                             db: Session = Depends(get_db)):
-    user.ntfy_topic = None
-    db.commit()
-    return {"ok": True}
+    if not _cron_lock.acquire(blocking=False):
+        return {"busy": True}
+    try:
+        return jobs.run_hourly(db)
+    finally:
+        _cron_lock.release()
 
 
 # ---------- Goals ----------
@@ -140,17 +134,42 @@ def create_goal(payload: schemas.GoalCreate, user: models.User = Depends(current
 def list_goals(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     today = user_today(user)
     goals = db.query(models.Goal).filter_by(user_id=user.id).order_by(models.Goal.id).all()
-    return [
-        {"id": g.id, "title": g.title, "deadline": g.deadline, "status": g.status,
-         "risk": planner.goal_risk(db, g, today), **planner.goal_progress(db, g.id)}
-        for g in goals
-    ]
+    return [goal_json(db, g, today) for g in goals]
+
+
+def goal_json(db: Session, g: models.Goal, today) -> dict:
+    import json, re
+    try:
+        d = json.loads(g.details or "{}")
+    except json.JSONDecodeError:
+        d = {}
+    out = {"id": g.id, "title": g.title, "deadline": g.deadline, "status": g.status or "active",
+           "kind": g.kind or "general", "risk": planner.goal_risk(db, g, today) if g.status != "planning" else None,
+           **planner.goal_progress(db, g.id)}
+    book = (d.get("facts") or {}).get("book")
+    if g.kind == "book" and book:
+        read = 0
+        for (title,) in db.query(models.Task.title).filter_by(goal_id=g.id, status="done").all():
+            m = re.search(r"pages \d+–(\d+)", title)
+            if m:
+                read = max(read, int(m.group(1)))
+        out["book"] = {"title": book.get("title"), "author": book.get("author"), "pages": book.get("pages"),
+                       "read": read, "url": book.get("url")}
+    if d.get("plan"):
+        out["plan_summary"] = d["plan"].get("summary")
+    habits = db.query(models.Recurring).filter_by(goal_id=g.id).all()
+    if habits:
+        out["habits"] = [{"title": h.title, "minutes": h.minutes,
+                          "days": [int(x) for x in h.weekdays.split(",") if x]} for h in habits]
+    return out
 
 
 @app.delete("/goals/{goal_id}")
 def delete_goal(goal_id: int, user: models.User = Depends(current_user),
                 db: Session = Depends(get_db)):
     goal = _own(db, models.Goal, goal_id, user)
+    db.query(models.GoalMessage).filter_by(goal_id=goal.id).delete(synchronize_session=False)
+    db.query(models.Recurring).filter_by(goal_id=goal.id).delete(synchronize_session=False)
     task_ids = [tid for (tid,) in db.query(models.Task.id).filter_by(goal_id=goal.id).all()]
     if task_ids:
         db.query(models.PlanItem).filter(models.PlanItem.task_id.in_(task_ids)) \
@@ -248,11 +267,9 @@ def add_calendar_block(payload: schemas.CalendarBlockCreate,
 @app.get("/calendar")
 def list_calendar(date: dt.date | None = None, user: models.User = Depends(current_user),
                   db: Session = Depends(get_db)):
+    """Busy time on a date: one-off blocks plus routines (office, gym...) that apply."""
     date = date or user_today(user)
-    blocks = db.query(models.CalendarBlock).filter_by(user_id=user.id, date=date) \
-               .order_by(models.CalendarBlock.start_time).all()
-    return [{"id": b.id, "date": b.date, "start": b.start_time, "end": b.end_time,
-             "title": b.title} for b in blocks]
+    return [{**b, "date": date} for b in routines.busy_blocks(db, user.id, date)]
 
 
 @app.delete("/calendar/{block_id}")
@@ -278,9 +295,6 @@ def generate_plan(date: dt.date | None = None, user: models.User = Depends(curre
                   db: Session = Depends(get_db)):
     date = date or user_today(user)
     items = planner.generate_daily_plan(db, user.id, date, _not_before(user, date))
-    if user.ntfy_topic:
-        first = db.get(models.Task, items[0].task_id).title if items else None
-        notifications.notify_daily_plan(user.ntfy_topic, len(items), first)
     return {"date": date, "scheduled": len(items)}
 
 
@@ -307,10 +321,8 @@ def what_now(payload: schemas.WhatNowRequest, user: models.User = Depends(curren
                                         user_today(user))
     if not task:
         return {"task": None, "message": "Nothing pending — enjoy the gap."}
-    if user.ntfy_topic:
-        notifications.notify_what_now(user.ntfy_topic, task.title, task.estimated_minutes)
     return {"task": task.title, "task_id": task.id, "estimated_minutes": task.estimated_minutes,
-            "priority": task.priority}
+            "priority": task.priority, "energy": task.energy_required}
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

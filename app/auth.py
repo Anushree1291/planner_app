@@ -9,12 +9,11 @@ from collections import defaultdict, deque
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from . import models, schemas, demo
 from .database import get_db
-from .config import AI_DAILY_LIMIT_PER_USER, AI_DAILY_LIMIT_PER_GUEST
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -116,22 +115,30 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> models.User
 
 
 def public_user(user: models.User, db: Session) -> dict:
-    from .ai_decompose import ai_calls_left  # local import avoids a cycle
-    from .config import ANTHROPIC_API_KEY
+    from .ai_decompose import ai_calls_left, daily_limit, active_providers  # avoids a cycle
+    from .emailer import email_enabled
     return {
         "id": user.id, "email": user.email, "name": user.name,
         "timezone": user.timezone, "is_guest": user.is_guest,
-        "notifications_connected": bool(user.ntfy_topic),
+        "email_enabled": email_enabled(),
+        "email_verified": bool(user.email_verified),
+        "email_morning_plan": bool(user.email_morning_plan),
+        "email_risk_alerts": bool(user.email_risk_alerts),
+        "email_morning_hour": user.email_morning_hour or 7,
+        "email_bounced": bool(user.email_bounced),
+        "email_weekly_digest": bool(user.email_weekly_digest),
+        "day_pattern": user.day_pattern or "steady",
         "ai_calls_left_today": ai_calls_left(db, user),
-        "ai_daily_limit": 0 if not ANTHROPIC_API_KEY else
-                          (AI_DAILY_LIMIT_PER_GUEST if user.is_guest else AI_DAILY_LIMIT_PER_USER),
+        "ai_daily_limit": daily_limit(user),
+        "ai_providers": active_providers(),
     }
 
 
 # ---------- routes ----------
 
 @router.post("/signup")
-def signup(payload: schemas.SignupRequest, request: Request, db: Session = Depends(get_db)):
+def signup(payload: schemas.SignupRequest, request: Request, background: BackgroundTasks,
+           db: Session = Depends(get_db)):
     signup_limiter.check(client_ip(request))
     email = payload.email.strip().lower()
     if db.query(models.User).filter_by(email=email).first():
@@ -141,6 +148,8 @@ def signup(payload: schemas.SignupRequest, request: Request, db: Session = Depen
                      timezone=clean_timezone(payload.timezone))
     db.commit()
     _start_session(request, user)
+    from .mailing import send_verification  # local import avoids a cycle
+    background.add_task(send_verification, user.id, True)   # welcome + confirm-your-email
     return public_user(user, db)
 
 
@@ -186,6 +195,16 @@ def update_me(payload: schemas.SettingsUpdate, user: models.User = Depends(curre
         user.timezone = clean_timezone(payload.timezone)
     if payload.name is not None:
         user.name = payload.name.strip() or user.name
+    if payload.email_morning_plan is not None:
+        user.email_morning_plan = payload.email_morning_plan
+    if payload.email_risk_alerts is not None:
+        user.email_risk_alerts = payload.email_risk_alerts
+    if payload.email_morning_hour is not None:
+        user.email_morning_hour = payload.email_morning_hour
+    if payload.email_weekly_digest is not None:
+        user.email_weekly_digest = payload.email_weekly_digest
+    if payload.day_pattern is not None:
+        user.day_pattern = payload.day_pattern
     db.commit()
     return public_user(user, db)
 
@@ -202,7 +221,8 @@ def delete_me(request: Request, user: models.User = Depends(current_user),
 
 def delete_user_data(db: Session, user_id: int):
     # Explicit deletes so this works the same on SQLite (no FK cascades by default) and Postgres.
-    for model in (models.PlanItem, models.CalendarBlock, models.AiUsage, models.Task,
-                  models.Goal, models.UserProfile):
+    for model in (models.PlanItem, models.CalendarBlock, models.AiUsage, models.EmailSend,
+                  models.GoalMessage, models.Recurring, models.RoutineSkip, models.Routine,
+                  models.DayStatus, models.Task, models.Goal, models.UserProfile):
         db.query(model).filter_by(user_id=user_id).delete(synchronize_session=False)
     db.query(models.User).filter_by(id=user_id).delete(synchronize_session=False)

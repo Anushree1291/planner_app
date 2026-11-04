@@ -1,16 +1,17 @@
-# Deploying to Azure (low-cost setup)
+# Deploying to Azure (low-cost setup, command line)
 
 This guide puts the planner on a public HTTPS URL for about **$0/month**
 (the free App Service tier) or about **$13/month** if you want the site to stay awake.
+Prefer clicking through the portal? See `DEPLOY_AZURE_PORTAL.md`.
 
 ```
                 ┌──────────────── Azure ────────────────┐
  Browser ──────►│ App Service (Linux, Python 3.11)      │──────► Neon Postgres (free)
  (users)        │ FastAPI + dashboard                   │
-                │        ▲                              │──────► Claude API (AI breakdown)
-                │        │ POST /internal/cron/hourly   │──────► ntfy.sh (push to phone/laptop)
+                │        ▲                              │──────► Azure AI Foundry / Gemini (AI breakdown)
+                │        │ POST /internal/cron/hourly   │──────► Azure Communication Services Email
                 │ Function App (Flex Consumption)       │
-                │ timer: minute 2 of every hour         │
+                │ timer: every 5 minutes                │
                 └───────────────────────────────────────┘
  GitHub ── push to main ──► GitHub Actions: tests (SQLite + Postgres) ──► deploy ──► smoke test
 ```
@@ -19,9 +20,9 @@ This guide puts the planner on a public HTTPS URL for about **$0/month**
 |---|---|---|
 | Web app | Azure App Service, **F1 Free** Linux plan | $0 (B1 ≈ $13/mo if you want it always awake) |
 | Database | **Neon** serverless Postgres, free plan | $0 |
-| Hourly jobs | Azure Functions **Flex Consumption** timer | ~$0 (pay per execution; a storage account costs a few cents) |
+| Scheduled jobs | Azure Functions **Flex Consumption** timer | ~$0 (pay per execution; a storage account costs a few cents) |
 | CI/CD | GitHub Actions | $0 for public repos |
-| AI | Anthropic API, Claude Haiku, rate-limited | a few cents per day, capped by `AI_DAILY_LIMIT_GLOBAL` |
+| AI | Azure AI Foundry (any deployed model) and/or Google Gemini, rate-limited | Gemini free tier: $0. Small Foundry models: cents per day, capped by `AI_DAILY_LIMIT_GLOBAL` |
 
 > **Student?** *Azure for Students* gives you free credit without needing a credit card.
 > Sign up with your college email at azure.microsoft.com/free/students.
@@ -37,8 +38,9 @@ upgrade to B1 in step 8, and downgrade again afterwards.
 
 - A GitHub account.
 - An Azure account (portal.azure.com).
-- An Anthropic API key (console.anthropic.com). In Settings → Limits, set a **monthly spend limit**
-  of something like $5. That is your hard safety net.
+- Optional, for AI breakdowns: a model deployed in **Azure AI Foundry** (ai.azure.com) and/or a free
+  **Gemini API key** (aistudio.google.com/apikey). Step 4c of `DEPLOY_AZURE_PORTAL.md` shows where to find
+  the endpoint, key and deployment name.
 - All commands below run in **Azure Cloud Shell**, a Bash terminal in your browser with
   `az`, `git` and `zip` already installed. Open it from the `>_` icon at the top of the Azure portal and choose *Bash*.
   You don't need to install anything on your laptop.
@@ -57,7 +59,7 @@ git remote add origin https://github.com/<your-username>/planner-app.git
 git push -u origin main
 ```
 
-The first push runs the tests. The deploy step will fail until step 5 is done, and that's expected.
+The first push runs the tests. The deploy job is skipped until step 5 is done.
 
 ## 2. Create the free Postgres database (Neon)
 
@@ -92,7 +94,8 @@ If `F1` is rejected in your region ("free tier not available"), try `LOC=southin
 
 ## 4. Configure secrets on the web app
 
-Generate two long random secrets and set the app settings. Paste your Neon URL and API key in place of the placeholders:
+Generate two long random secrets and set the app settings. Paste your Neon URL and AI keys in place of
+the placeholders, and leave out the lines for any AI provider you don't use:
 
 ```bash
 SECRET_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(48))")
@@ -104,13 +107,24 @@ az webapp config appsettings set -g $RG -n $APP --settings \
   APP_ENV=production \
   PUBLIC_URL="https://$APP.azurewebsites.net" \
   DATABASE_URL='postgresql://USER:PASSWORD@ep-xxxx.aws.neon.tech/plannerdb?sslmode=require' \
-  ANTHROPIC_API_KEY='sk-ant-...' \
   SECRET_KEY="$SECRET_KEY" \
   CRON_SECRET="$CRON_SECRET" \
+  AI_PROVIDER='azure,gemini' \
+  AZURE_AI_ENDPOINT='https://<your-resource>.openai.azure.com/' \
+  AZURE_AI_API_KEY='<foundry key>' \
+  AZURE_AI_DEPLOYMENT='<deployment name, e.g. gpt-4o-mini>' \
+  GEMINI_API_KEY='<gemini key>' \
+  ACS_CONNECTION_STRING='endpoint=https://<acs>.communication.azure.com/;accesskey=...' \
+  EMAIL_FROM='DoNotReply@<xxxx>.azurecomm.net' \
+  EMAIL_RATE_PER_MINUTE=5 EMAIL_RATE_PER_HOUR=10 \
   AI_DAILY_LIMIT_PER_USER=3 \
   AI_DAILY_LIMIT_PER_GUEST=1 \
   AI_DAILY_LIMIT_GLOBAL=100
 ```
+
+Email goes through Azure Communication Services from a no-reply address. `EMAIL_AZURE.md` shows how to
+create it, move to your own domain and raise the sending limits; update `EMAIL_FROM` and the two
+`EMAIL_RATE_*` values as you go.
 
 Secrets live only in Azure, never in the repo. You can view or edit them later under
 *Web App → Settings → Environment variables*.
@@ -135,7 +149,7 @@ In your GitHub repo, open **Settings → Secrets and variables → Actions**:
 Then open **Actions → Test & deploy → Run workflow**, or just push a commit. When it's green, open
 `https://<APP>.azurewebsites.net`. The workflow's last step waits until `/healthz` responds.
 
-## 6. Hourly timer for morning plans and risk alerts
+## 6. Timer for morning plans and alerts (every 5 minutes)
 
 ```bash
 FUNC=$APP-cron
@@ -175,7 +189,7 @@ Actions schedule instead. Add the secrets `PLANNER_URL` and `CRON_SECRET` to the
 ```yaml
 name: Hourly planner tick
 on:
-  schedule: [{ cron: "2 * * * *" }]
+  schedule: [{ cron: "*/5 * * * *" }]
   workflow_dispatch:
 jobs:
   tick:
@@ -190,10 +204,10 @@ GitHub may delay scheduled runs by a few minutes. That's fine for a morning plan
 ## 7. Try it
 
 1. Open the site and click **Try the demo** (or sign up). Then click *Generate plan*.
-2. Add a goal with "break down with AI" ticked. You should get 8–15 tasks. After the daily limit,
-   it falls back to a template and tells you so.
-3. Notifications: install the **ntfy** app on your phone, subscribe to a hard-to-guess topic,
-   and enter the same topic in the dashboard. A test push arrives immediately.
+2. Add a goal with "break down with AI" ticked. You should get 8–15 tasks, and the message names the
+   provider (Azure AI Foundry or Gemini). After the daily limit, it falls back to a template and tells you so.
+3. Email: sign up with your own address, click the confirm link in the welcome email, then use
+   **Settings → Email me today's plan**. From then on it arrives at 7:00 your time.
 4. On your phone, use the browser's *Add to Home Screen* for an app-like icon.
 
 ## 8. Useful commands
@@ -215,5 +229,6 @@ az group delete -n $RG                                 # tear EVERYTHING down
 | `ModuleNotFoundError` in logs | `SCM_DO_BUILD_DURING_DEPLOYMENT=true` is missing, so the dependencies weren't installed. Set it and re-run the workflow. |
 | Deploy step: *401 / publish profile invalid* | Re-run the `basicPublishingCredentialsPolicies` command in step 5, download a fresh profile and update the secret. |
 | Site stopped with a "quota exceeded" page | The F1 60 CPU-min/day limit was hit. It resets daily. Upgrade to B1 for demos. |
-| AI always says "used a template" | Check `ANTHROPIC_API_KEY` is set, and look in the logs for `AI decomposition failed`. |
+| AI always says "used a template" | Logs show `AI provider azure failed: …` / `gemini failed: …`. **401**: wrong key. **404** on Azure: wrong `AZURE_AI_DEPLOYMENT`. **404** on Gemini: wrong `GEMINI_MODEL`. **429**: rate limit or quota. |
+| No emails arrive | Logs show `sending email to … failed`. `EMAIL_FROM` must exactly match a MailFrom address on a domain connected to your Communication Services resource. Only confirmed addresses get scheduled mail. Check spam. |
 | Logged out after every deploy | `SECRET_KEY` changed or isn't set. Keep it fixed. |

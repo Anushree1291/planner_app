@@ -3,191 +3,658 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="theme-color" content="#0f1117" />
-<meta name="description" content="Calendar-aware, energy-aware daily planner that turns goals into a realistic plan." />
+<meta name="theme-color" content="#1E2235" />
+<meta name="description" content="A planner that fits your goals around your calendar and your energy, and replans when you skip something." />
 <title>AI Execution Planner</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b6ef5'/><path d='M28 52l14 14 30-32' stroke='white' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%231E2235'/><rect x='14' y='14' width='36' height='9' rx='4.5' fill='%23E8962E'/><rect x='14' y='28' width='26' height='9' rx='4.5' fill='%232B9C93'/><rect x='14' y='42' width='31' height='9' rx='4.5' fill='%236A5FC8'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,750&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
+:root {
+  --fog:#EEF1F7; --surface:#FFFFFF; --sunken:#F6F7FB; --ink:#1E2235; --muted:#626A84; --line:#DCE1EC;
+  --sun:#E8962E; --sun-tint:#FFF1DD; --sun-ink:#8A520B;
+  --tide:#2B9C93; --tide-tint:#DFF3F1; --tide-ink:#13625B;
+  --dusk:#6A5FC8; --dusk-tint:#ECEAFB; --dusk-ink:#3F3592;
+  --night:#1E2235; --busy:#C3CAD9; --danger:#C93C3C; --danger-tint:#FBE7E7; --ok:#22865E;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --text:"Instrument Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --r-lg:20px; --r-md:12px; --r-sm:8px;
+  --hour:56px;
+  --shadow:0 1px 2px rgba(30,34,53,.06), 0 8px 24px -12px rgba(30,34,53,.18);
+}
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg:#f5f6f8; --card:#ffffff; --text:#1b1d23; --muted:#6b7080; --line:#e3e5ea;
-    --accent:#3b6ef5; --accent-text:#fff; --ok:#1f9d55; --warn:#c77700; --danger:#d23b3b;
-    --chip:#eef1f6; --high:#e8eefe; --medium:#f1f3f6; --low:#f6f1ea;
+    --fog:#141726; --surface:#1C2033; --sunken:#181C2C; --ink:#E8EAF3; --muted:#9AA1B9; --line:#2C3149;
+    --sun-tint:#3A2C17; --sun-ink:#F6C17A; --tide-tint:#163633; --tide-ink:#7FD6CD;
+    --dusk-tint:#28264A; --dusk-ink:#B8B1F2; --night:#0E1120; --busy:#3A4058; --danger:#F07D7D; --danger-tint:#3A1F25; --ok:#5CCB9B;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg:#0f1117; --card:#181b24; --text:#e6e6e6; --muted:#9aa0ad; --line:#2a2e3a;
-      --chip:#232734; --high:#1d2744; --medium:#20232d; --low:#2b251d;
-    }
-  }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:-apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
-  .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
-  header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
-  h1 { font-size:20px; margin:0; }
-  h2 { font-size:16px; margin:0 0 12px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
-  input, select, button { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); }
-  input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px; }
-  button { cursor:pointer; background:var(--accent); color:var(--accent-text); border:none; font-weight:600; }
-  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); font-weight:500; }
-  button.small { padding:4px 8px; font-size:13px; }
-  button.danger { color:var(--danger); }
-  button:disabled { opacity:.6; cursor:default; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .row > input.grow { flex:1 1 200px; min-width:0; }
-  .muted { color:var(--muted); font-size:13px; }
-  ul { list-style:none; padding:0; margin:12px 0 0; }
-  li { padding:10px 0; border-top:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  li:first-child { border-top:none; }
-  .time { font-variant-numeric:tabular-nums; color:var(--muted); min-width:92px; font-size:14px; }
-  .title { flex:1 1 180px; min-width:0; overflow-wrap:anywhere; }
-  .done .title { text-decoration:line-through; color:var(--muted); }
-  .chip { font-size:12px; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--muted); white-space:nowrap; }
-  .chip.high { background:var(--high); } .chip.low { background:var(--low); }
-  .chip.risk { color:var(--danger); } .chip.okc { color:var(--ok); }
-  .bar { height:6px; background:var(--chip); border-radius:99px; overflow:hidden; flex:1 1 100%; }
-  .bar > span { display:block; height:100%; background:var(--accent); }
-  .banner { background:var(--chip); border-radius:10px; padding:10px 12px; margin-bottom:16px; font-size:14px; }
-  .auth { max-width:400px; margin:8vh auto 0; }
-  .auth input { width:100%; margin-bottom:8px; }
-  .auth button { width:100%; }
-  .tabs { display:flex; gap:4px; margin-bottom:12px; }
-  .tabs button { flex:1; background:transparent; color:var(--muted); border:1px solid var(--line); }
-  .tabs button.on { background:var(--chip); color:var(--text); }
-  .or { text-align:center; margin:14px 0; color:var(--muted); font-size:13px; }
-  .err { color:var(--danger); font-size:14px; min-height:20px; margin:4px 0; }
-  .result { margin-top:10px; font-weight:600; }
-  details > summary { cursor:pointer; color:var(--muted); font-size:13px; margin-top:6px; }
-  #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:90vw; }
-  #toast.show { opacity:1; }
-  [hidden] { display:none !important; }
-  a { color:var(--accent); }
-  @media (prefers-color-scheme: dark) { a { color:#8fb0ff; } }
-  footer { text-align:center; margin-top:24px; }
-  footer a { color:var(--muted); }
+}
+* { box-sizing:border-box; }
+html { -webkit-text-size-adjust:100%; }
+body { margin:0; background:var(--fog); color:var(--ink); font:16px/1.5 var(--text); }
+h1, h2, h3 { font-family:var(--display); font-weight:650; letter-spacing:-.01em; margin:0; }
+button, input, select { font:inherit; color:inherit; }
+a { color:var(--tide-ink); }
+:focus-visible { outline:3px solid var(--tide); outline-offset:2px; border-radius:6px; }
+[hidden] { display:none !important; }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+/* ---------- buttons & inputs ---------- */
+.btn { display:inline-flex; align-items:center; gap:8px; border:0; border-radius:var(--r-md); padding:10px 16px;
+  background:var(--ink); color:var(--surface); font-weight:600; cursor:pointer; transition:transform .12s, opacity .12s; }
+.btn:hover { opacity:.92; } .btn:active { transform:scale(.97); }
+.btn:disabled { opacity:.5; cursor:default; transform:none; }
+.btn.quiet { background:transparent; color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
+.btn.quiet:hover { background:var(--sunken); opacity:1; }
+.btn.small { padding:6px 10px; font-size:14px; border-radius:var(--r-sm); }
+.btn.danger { background:transparent; color:var(--danger); box-shadow:inset 0 0 0 1px var(--danger-tint); }
+.icon-btn { border:0; background:transparent; width:32px; height:32px; border-radius:50%; display:grid; place-items:center;
+  cursor:pointer; color:var(--muted); }
+.icon-btn:hover { background:var(--sunken); color:var(--ink); }
+.field { display:grid; gap:6px; font-size:14px; color:var(--muted); }
+.input { width:100%; padding:11px 12px; border-radius:var(--r-md); border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+.input:focus { outline:none; border-color:var(--tide); box-shadow:0 0 0 3px var(--tide-tint); }
+.muted { color:var(--muted); }
+.small { font-size:14px; }
+
+/* chips (minutes / energy pickers) */
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:6px 12px; font-size:14px; cursor:pointer; }
+.chip[aria-pressed="true"] { background:var(--ink); color:var(--surface); border-color:var(--ink); }
+.chip.e-high[aria-pressed="true"] { background:var(--sun); border-color:var(--sun); color:#2A1A04; }
+.chip.e-medium[aria-pressed="true"] { background:var(--tide); border-color:var(--tide); color:#fff; }
+.chip.e-low[aria-pressed="true"] { background:var(--dusk); border-color:var(--dusk); color:#fff; }
+.dot { width:9px; height:9px; border-radius:50%; display:inline-block; flex:none; }
+.dot.high { background:var(--sun); } .dot.medium { background:var(--tide); } .dot.low { background:var(--dusk); }
+
+/* switch */
+.switch { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; cursor:pointer; }
+.switch input { appearance:none; width:44px; height:26px; border-radius:99px; background:var(--line); position:relative; cursor:pointer; flex:none; transition:background .15s; }
+.switch input::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+.switch input:checked { background:var(--tide); }
+.switch input:checked::after { transform:translateX(18px); }
+.switch input:disabled { opacity:.5; }
+
+/* ================= AUTH ================= */
+.auth { min-height:100vh; display:grid; grid-template-columns:1.1fr 1fr; }
+.auth-story { background:var(--night); color:#E8EAF3; padding:56px clamp(24px,5vw,72px); display:flex; flex-direction:column; justify-content:center; gap:28px; }
+.brand { display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:750; font-size:18px; }
+.brand-mark { width:28px; height:28px; border-radius:8px; background:#2A2F47; display:grid; gap:3px; padding:6px 5px; }
+.brand-mark i { display:block; height:4px; border-radius:2px; }
+.brand-mark i:nth-child(1){ background:var(--sun); } .brand-mark i:nth-child(2){ background:var(--tide); width:70%; } .brand-mark i:nth-child(3){ background:var(--dusk); width:85%; }
+.auth-story h1 { font-size:clamp(38px,5vw,60px); line-height:1.02; font-weight:750; letter-spacing:-.03em; max-width:11ch; }
+.auth-story p { color:#B9BED2; font-size:18px; max-width:42ch; margin:0; }
+.ribbon { display:grid; grid-template-columns:42px 1fr; gap:0 12px; max-width:440px; }
+.ribbon .h { font-family:var(--display); color:#7E86A3; font-size:13px; height:30px; transform:translateY(-8px); }
+.ribbon .lane { position:relative; border-top:1px solid #2E3450; height:30px; }
+.ribbon .blk { position:absolute; left:0; right:0; border-radius:8px; padding:4px 10px; font-size:13px; font-weight:600; z-index:1; }
+.ribbon .blk.high { background:#3A2C17; color:#F6C17A; border-left:4px solid var(--sun); }
+.ribbon .blk.medium { background:#163633; color:#7FD6CD; border-left:4px solid var(--tide); }
+.ribbon .blk.low { background:#28264A; color:#B8B1F2; border-left:4px solid var(--dusk); }
+.ribbon .blk.busy { background:repeating-linear-gradient(135deg,#2A2F47 0 6px,#30364F 6px 12px); color:#8C93AE; font-weight:500; }
+.auth-form { display:grid; place-items:center; padding:40px 20px; }
+.auth-card { width:100%; max-width:380px; display:grid; gap:14px; }
+.auth-card h2 { font-size:28px; }
+.seg { display:grid; grid-template-columns:1fr 1fr; background:var(--sunken); border-radius:var(--r-md); padding:4px; box-shadow:inset 0 0 0 1px var(--line); }
+.seg button { border:0; background:transparent; padding:8px; border-radius:9px; cursor:pointer; font-weight:600; color:var(--muted); }
+.seg button[aria-selected="true"] { background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+.err { color:var(--danger); font-size:14px; min-height:20px; }
+.or { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:14px; }
+.or::before, .or::after { content:""; height:1px; flex:1; background:var(--line); }
+
+/* ================= APP SHELL ================= */
+.app { max-width:1180px; margin:0 auto; padding:20px clamp(16px,3vw,32px) 64px; }
+.topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
+.topbar .brand { color:var(--ink); }
+.topbar .brand-mark { background:var(--ink); }
+.tabs { display:flex; gap:4px; background:var(--surface); border-radius:999px; padding:4px; box-shadow:var(--shadow); }
+.tabs button { border:0; background:transparent; padding:8px 16px; border-radius:999px; cursor:pointer; font-weight:600; color:var(--muted); }
+.tabs button[aria-selected="true"] { background:var(--ink); color:var(--surface); }
+.who { display:flex; align-items:center; gap:10px; }
+.avatar { width:36px; height:36px; border-radius:50%; border:0; cursor:pointer; font-family:var(--display); font-weight:750; color:#fff;
+  background:conic-gradient(from 200deg, var(--sun), var(--tide), var(--dusk), var(--sun)); }
+.notice { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; background:var(--surface);
+  border-radius:var(--r-md); padding:12px 16px; margin-bottom:16px; box-shadow:inset 4px 0 0 var(--tide), var(--shadow); font-size:15px; }
+
+/* ---------- today header ---------- */
+.day-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:8px 0 20px; }
+.day-head h1 { font-size:clamp(34px,5vw,56px); line-height:1; font-weight:750; letter-spacing:-.035em; }
+.day-head p { margin:8px 0 0; color:var(--muted); font-size:17px; }
+.day-head p b { color:var(--ink); font-weight:600; }
+.actions { display:flex; gap:8px; flex-wrap:wrap; }
+
+.today { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr); gap:20px; align-items:start; }
+
+/* ---------- timeline ---------- */
+.timeline-wrap { background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow); overflow:hidden; }
+.tl-legend { display:flex; gap:16px; flex-wrap:wrap; padding:14px 18px; border-bottom:1px solid var(--line); font-size:13px; color:var(--muted); }
+.tl-legend span { display:inline-flex; align-items:center; gap:6px; }
+.tl-legend .busy-swatch { width:14px; height:10px; border-radius:3px; background:repeating-linear-gradient(135deg,var(--busy) 0 3px,transparent 3px 6px); box-shadow:inset 0 0 0 1px var(--busy); }
+.tl-scroll { max-height:min(70vh,760px); overflow-y:auto; scroll-behavior:smooth; }
+.tl { position:relative; display:grid; grid-template-columns:56px 1fr; padding:10px 14px 18px 0; }
+.tl-hours { position:relative; }
+.tl-hours div { height:var(--hour); font-family:var(--display); font-size:13px; color:var(--muted); text-align:right; padding-right:10px; transform:translateY(-9px); font-variant-numeric:tabular-nums; }
+.tl-grid { position:relative; cursor:copy; background-image:repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour)); }
+.tl-grid::after { content:""; position:absolute; inset:0; background-image:repeating-linear-gradient(to bottom, transparent 0 calc(var(--hour) / 2), color-mix(in srgb, var(--line) 50%, transparent) calc(var(--hour) / 2) calc(var(--hour) / 2 + 1px), transparent calc(var(--hour) / 2 + 1px) var(--hour)); pointer-events:none; }
+.blk { position:absolute; left:8px; right:4px; border-radius:10px; padding:6px 10px; overflow:hidden; cursor:pointer; z-index:1;
+  display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
+.blk > div:first-child { min-width:0; flex:1; }
+.blk .t { font-weight:600; font-size:14px; line-height:1.25; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.blk .m { font-size:12px; opacity:.85; font-variant-numeric:tabular-nums; }
+.blk.task { border-left:5px solid; }
+.blk.task.high { background:var(--sun-tint); color:var(--sun-ink); border-color:var(--sun); }
+.blk.task.medium { background:var(--tide-tint); color:var(--tide-ink); border-color:var(--tide); }
+.blk.task.low { background:var(--dusk-tint); color:var(--dusk-ink); border-color:var(--dusk); }
+.blk.task.done { filter:saturate(.35); opacity:.7; }
+.blk.task.done .t { text-decoration:line-through; }
+.blk.busy { background:repeating-linear-gradient(135deg, color-mix(in srgb,var(--busy) 45%,transparent) 0 6px, transparent 6px 12px); box-shadow:inset 0 0 0 1px var(--busy); color:var(--muted); }
+.blk.tiny { padding:2px 10px; align-items:center; }
+.blk.tiny .m { display:none; }
+.blk.micro { padding:0 10px; } .blk.micro > div:first-child { display:none; }
+.blk.tiny .t { display:block; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
+.past { position:absolute; left:0; right:0; top:0; background:color-mix(in srgb, var(--sunken) 75%, transparent); pointer-events:none; }
+.blk-actions { position:absolute; right:6px; top:50%; transform:translateY(-50%); display:flex; gap:4px; padding:3px;
+  border-radius:10px; background:color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter:blur(4px);
+  opacity:0; pointer-events:none; transition:opacity .12s; }
+.blk:hover .blk-actions, .blk:focus-within .blk-actions, .blk.open .blk-actions { opacity:1; pointer-events:auto; }
+.blk-actions.static { position:static; transform:none; background:none; backdrop-filter:none; padding:0; opacity:1; }
+.blk.micro .blk-actions { display:flex; }
+.blk-actions button { border:0; border-radius:8px; padding:4px 8px; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--ink); }
+.blk-actions button.go { background:var(--ink); color:var(--surface); }
+.now { position:absolute; left:0; right:0; height:0; border-top:2px solid var(--danger); z-index:2; pointer-events:none; }
+.now::before { content:""; position:absolute; left:-6px; top:-6px; width:10px; height:10px; border-radius:50%; background:var(--danger); }
+.now span { position:absolute; right:6px; top:-20px; font-size:11px; font-weight:600; color:var(--danger); background:var(--surface); padding:0 4px; border-radius:4px; }
+.tl-empty { position:absolute; left:12px; right:12px; top:calc(var(--hour) * 2); text-align:center; padding:28px 16px; border-radius:var(--r-md);
+  background:color-mix(in srgb,var(--surface) 88%,transparent); z-index:1; pointer-events:none; }
+.tl-empty h3 { font-size:22px; margin-bottom:6px; }
+@keyframes drop { from { opacity:0; transform:translateY(-14px) scale(.98); } to { opacity:1; transform:none; } }
+.planning .blk.task { animation:drop .42s cubic-bezier(.2,.8,.2,1.2) both; animation-delay:calc(var(--i) * 70ms); }
+
+/* ---------- side panel ---------- */
+.side { display:grid; gap:20px; }
+.panel { background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow); padding:20px; }
+.panel h2 { font-size:21px; margin-bottom:4px; }
+.panel > p.muted { margin:0 0 14px; font-size:15px; }
+.focus-pick { display:grid; gap:12px; }
+.suggestion { margin-top:16px; padding:16px; border-radius:var(--r-md); background:var(--sunken); }
+.suggestion h3 { font-size:20px; line-height:1.2; margin:4px 0 12px; overflow-wrap:anywhere; }
+.timer { display:grid; justify-items:center; gap:14px; text-align:center; }
+.ring { width:188px; height:188px; position:relative; }
+.ring svg { transform:rotate(-90deg); }
+.ring .track { stroke:var(--line); }
+.ring .bar { stroke:var(--tide); transition:stroke-dashoffset .9s linear; stroke-linecap:round; }
+.ring .clock { position:absolute; inset:0; display:grid; place-items:center; align-content:center; }
+.ring .clock b { font-family:var(--display); font-size:44px; font-weight:750; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1; }
+.ring .clock span { font-size:13px; color:var(--muted); margin-top:4px; }
+.timer h3 { font-size:18px; max-width:28ch; overflow-wrap:anywhere; }
+.goal-mini { display:grid; gap:12px; margin-top:6px; }
+.goal-mini button { all:unset; display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; cursor:pointer; padding:6px; margin:-6px; border-radius:var(--r-sm); }
+.goal-mini button:hover { background:var(--sunken); }
+.goal-mini button:focus-visible { outline:3px solid var(--tide); }
+.goal-mini .name { font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* progress ring (goals) */
+.pring { --p:0; --c:var(--tide); width:44px; height:44px; border-radius:50%; flex:none;
+  background:conic-gradient(var(--c) calc(var(--p) * 1%), var(--line) 0); display:grid; place-items:center; }
+.pring::before { content:attr(data-label); width:34px; height:34px; border-radius:50%; background:var(--surface); display:grid; place-items:center;
+  font-family:var(--display); font-size:12px; font-weight:650; }
+.pring.risk { --c:var(--danger); }
+.pill { font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+.pill.risk { background:var(--danger-tint); color:var(--danger); }
+.pill.ok { background:var(--tide-tint); color:var(--tide-ink); }
+
+/* ================= GOALS VIEW ================= */
+.goals-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.6fr); gap:20px; align-items:start; }
+.new-goal { position:sticky; top:20px; }
+.new-goal h2 { font-size:26px; line-height:1.15; margin-bottom:14px; }
+.new-goal form { display:grid; gap:14px; }
+.goal-list { display:grid; gap:14px; }
+.goal { background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow); }
+.goal-head { display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; padding:16px 18px; }
+.goal-head .pring { width:56px; height:56px; }
+.goal-head .pring::before { width:44px; height:44px; font-size:14px; }
+.goal-head h3 { font-size:19px; line-height:1.25; overflow-wrap:anywhere; }
+.goal-head .meta { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px; font-size:14px; color:var(--muted); }
+.goal-risk { margin:0 18px 12px; padding:10px 12px; border-radius:var(--r-sm); background:var(--danger-tint); color:var(--danger); font-size:14px; }
+.goal details { border-top:1px solid var(--line); }
+.goal summary { list-style:none; cursor:pointer; padding:12px 18px; font-weight:600; font-size:15px; color:var(--muted); display:flex; justify-content:space-between; }
+.goal summary::-webkit-details-marker { display:none; }
+.goal summary::after { content:"Show steps"; }
+.goal details[open] summary::after { content:"Hide steps"; }
+.steps { list-style:none; margin:0; padding:0 18px 14px; display:grid; gap:2px; }
+.step { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); }
+.step:last-child { border-bottom:0; }
+.check { appearance:none; width:22px; height:22px; border-radius:7px; border:2px solid var(--line); cursor:pointer; display:grid; place-items:center; margin:0; transition:background .15s, border-color .15s; }
+.check:checked { background:var(--tide); border-color:var(--tide); }
+.check:checked::after { content:""; width:6px; height:11px; border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(45deg) translate(-1px,-1px); }
+.step.done .st { text-decoration:line-through; color:var(--muted); }
+.st { font-size:15px; overflow-wrap:anywhere; }
+.step-meta { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); white-space:nowrap; }
+.add-step { display:flex; gap:8px; padding:4px 18px 16px; }
+.add-step .input { padding:8px 10px; }
+.thinking { display:grid; gap:8px; padding:16px 18px; }
+.thinking div { height:14px; border-radius:7px; background:linear-gradient(90deg,var(--line),var(--sunken),var(--line)); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
+.thinking div:nth-child(2){ width:80%; } .thinking div:nth-child(3){ width:60%; }
+@keyframes shimmer { to { background-position:-200% 0; } }
+.empty { text-align:center; padding:40px 20px; color:var(--muted); background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow); }
+.empty h3 { color:var(--ink); font-size:22px; margin-bottom:6px; }
+
+/* ---------- today check-in ---------- */
+.checkin { display:grid; gap:12px; background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow); padding:16px 18px; margin:0 0 20px; }
+.checkin.ask { box-shadow:inset 4px 0 0 var(--sun), var(--shadow); }
+.checkin-row { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+.checkin h2 { font-size:19px; }
+.checkin .chip[aria-pressed="true"] { background:var(--tide); border-color:var(--tide); color:#fff; }
+.going { display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:14px; color:var(--muted); }
+
+/* ---------- goal chat ---------- */
+.chat { display:grid; grid-template-rows:auto minmax(0,1fr) auto auto; gap:12px; height:min(78vh,760px); }
+.chat-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+.chat-head h2 { font-size:21px; margin:0; overflow-wrap:anywhere; }
+.chat-log { overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:4px 2px; }
+.msg { max-width:88%; padding:10px 14px; border-radius:16px; font-size:15px; line-height:1.45; overflow-wrap:anywhere; white-space:pre-wrap; }
+.msg.assistant { background:var(--sunken); border-bottom-left-radius:6px; align-self:flex-start; }
+.msg.user { background:var(--ink); color:var(--surface); border-bottom-right-radius:6px; align-self:flex-end; }
+.found { align-self:flex-start; display:flex; gap:12px; align-items:center; padding:10px 14px; border-radius:12px; box-shadow:inset 0 0 0 1px var(--line); font-size:14px; max-width:88%; }
+.found .spine { width:10px; height:46px; border-radius:3px; background:linear-gradient(var(--sun),var(--dusk)); flex:none; }
+.found b { display:block; color:var(--ink); }
+.plan-card { border-radius:16px; padding:14px 16px; background:var(--surface); box-shadow:inset 0 0 0 2px var(--tide); display:grid; gap:8px; }
+.plan-card h4 { font-family:var(--display); font-size:17px; font-weight:650; margin:0; }
+.plan-card ul { margin:0; padding-left:18px; font-size:14px; color:var(--muted); display:grid; gap:2px; }
+.plan-card .late { color:var(--danger); }
+.quick { display:flex; flex-wrap:wrap; gap:6px; }
+.typing { align-self:flex-start; padding:12px 14px; background:var(--sunken); border-radius:16px; }
+.typing span { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--muted); margin-right:4px; animation:blink 1s infinite; }
+.typing span:nth-child(2) { animation-delay:.15s; } .typing span:nth-child(3) { animation-delay:.3s; }
+@keyframes blink { 0%, 80%, 100% { opacity:.25; } 40% { opacity:1; } }
+.chat-input { display:flex; gap:8px; }
+.ideas { display:grid; gap:8px; padding:0 18px 16px; }
+.idea { display:grid; gap:2px; padding:10px 12px; border-radius:10px; background:var(--sunken); font-size:14px; }
+.idea a { font-weight:600; color:var(--ink); text-decoration:none; }
+.idea a:hover { text-decoration:underline; }
+.kind { font-size:12px; color:var(--muted); }
+
+/* ---------- your week ---------- */
+.week-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px; }
+.week-row b { color:var(--ink); }
+.daypick { display:flex; gap:4px; flex-wrap:wrap; }
+.daypick .chip { padding:6px 10px; min-width:44px; text-align:center; }
+.step2 { display:grid; gap:12px; padding:22px; }
+.step2 h2 { font-size:22px; }
+
+/* ================= DRAWER & DIALOGS ================= */
+dialog { border:0; padding:0; background:var(--surface); color:var(--ink); box-shadow:0 30px 80px -20px rgba(0,0,0,.45); }
+dialog::backdrop { background:rgba(20,23,38,.45); backdrop-filter:blur(2px); }
+.drawer { margin:0 0 0 auto; height:100vh; max-height:100vh; width:min(440px,100vw); border-radius:var(--r-lg) 0 0 var(--r-lg); }
+.drawer[open] { animation:slide .22s ease-out; }
+@keyframes slide { from { transform:translateX(40px); opacity:0; } to { transform:none; opacity:1; } }
+.drawer-inner { padding:24px; display:grid; gap:24px; }
+.drawer-head { display:flex; justify-content:space-between; align-items:center; }
+.drawer h2 { font-size:26px; }
+.drawer section { display:grid; gap:10px; }
+.drawer h3 { font-size:17px; }
+.sep { border-top:1px solid var(--line); }
+.status { display:flex; align-items:center; gap:8px; font-size:14px; }
+.status.ok { color:var(--ok); } .status.wait { color:var(--sun-ink); }
+.bounced { display:grid; gap:8px; justify-items:start; padding:12px; border-radius:var(--r-sm); background:var(--danger-tint); color:var(--danger); font-size:14px; margin-top:8px; }
+.modal { width:min(460px,calc(100vw - 32px)); border-radius:var(--r-lg); }
+.modal form { padding:22px; display:grid; gap:14px; }
+.modal h2 { font-size:22px; }
+.row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.row > * { flex:1 1 120px; }
+.preview { width:min(680px,calc(100vw - 24px)); height:min(86vh,900px); border-radius:var(--r-lg); }
+.preview .bar { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); }
+.preview iframe { width:100%; height:calc(100% - 57px); border:0; background:#F1F3F8; }
+
+#toast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:var(--ink); color:var(--surface); padding:12px 18px;
+  border-radius:var(--r-md); font-size:15px; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; z-index:50; max-width:min(92vw,480px); box-shadow:var(--shadow); }
+#toast.show { opacity:1; transform:translate(-50%,0); }
+.burst { position:fixed; width:8px; height:8px; border-radius:2px; pointer-events:none; z-index:60; animation:burst .7s ease-out forwards; }
+@keyframes burst { to { transform:translate(var(--dx),var(--dy)) rotate(260deg); opacity:0; } }
+
+/* ================= RESPONSIVE ================= */
+@media (max-width:980px) {
+  .today, .goals-layout { grid-template-columns:1fr; }
+  .new-goal { position:static; }
+}
+@media (max-width:820px) {
+  .auth { grid-template-columns:1fr; }
+  .auth-story { padding:40px 20px 32px; gap:20px; }
+  .ribbon { display:none; }
+}
+@media (max-width:600px) {
+  .topbar { flex-wrap:wrap; }
+  .topbar .brand span { display:none; }
+  .tabs { order:3; width:100%; justify-content:center; }
+  .tabs button { flex:1; }
+  :root { --hour:52px; }
+  .tl-scroll { max-height:none; }
+  .tl-legend span:last-child { margin-left:0; flex-basis:100%; }
+  .drawer { border-radius:0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-<!-- ================= LOGIN / SIGNUP ================= -->
-<div id="authView" class="auth" hidden>
-  <h1 style="margin-bottom:6px">AI Execution Planner</h1>
-  <p class="muted" style="margin-top:0">Turns goals into a realistic daily plan that fits around your calendar and your energy, and replans when you skip something.</p>
-  <section>
-    <div class="tabs">
-      <button id="tabLogin" class="on" onclick="setTab('login')">Log in</button>
-      <button id="tabSignup" onclick="setTab('signup')">Sign up</button>
+<!-- ================= SIGN IN ================= -->
+<main id="authView" class="auth" hidden>
+  <section class="auth-story">
+    <div class="brand"><div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div>AI Execution Planner</div>
+    <h1>Plan the day you actually have.</h1>
+    <p>Give it a goal. It breaks the goal into steps, fits them around your calendar, puts hard work where your energy is, and replans when you skip something.</p>
+    <div class="ribbon" aria-hidden="true">
+      <div class="h">09:00</div><div class="lane"><div class="blk high" style="top:4px;height:52px">Draft the essay outline</div></div>
+      <div class="h">10:00</div><div class="lane"><div class="blk busy" style="top:4px;height:24px">Team stand-up</div></div>
+      <div class="h">11:00</div><div class="lane"></div>
+      <div class="h">14:00</div><div class="lane"><div class="blk medium" style="top:4px;height:38px">Read two chapters</div></div>
+      <div class="h">15:00</div><div class="lane"></div>
+      <div class="h">19:00</div><div class="lane"><div class="blk low" style="top:4px;height:24px">Stretching and plan tomorrow</div></div>
     </div>
-    <form id="authForm" onsubmit="submitAuth(event)">
-      <input id="authName" placeholder="Your name (optional)" autocomplete="name" hidden maxlength="80" />
-      <input id="authEmail" type="email" placeholder="Email" autocomplete="email" required maxlength="254" />
-      <input id="authPassword" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" required minlength="8" maxlength="128" />
-      <div class="err" id="authErr"></div>
-      <button id="authBtn" type="submit">Log in</button>
-    </form>
-    <div class="or">or</div>
-    <button class="ghost" style="width:100%" onclick="startDemo()">Try the demo without signing up</button>
-    <p class="muted" style="margin-bottom:0">The demo creates a private sandbox with sample goals. It's deleted after 24 hours.</p>
   </section>
-</div>
+  <section class="auth-form">
+    <div class="auth-card">
+      <h2 id="authTitle">Welcome back</h2>
+      <div class="seg" role="tablist">
+        <button id="tabLogin" role="tab" aria-selected="true" onclick="setTab('login')">Log in</button>
+        <button id="tabSignup" role="tab" aria-selected="false" onclick="setTab('signup')">Sign up</button>
+      </div>
+      <form id="authForm" onsubmit="submitAuth(event)" style="display:grid;gap:12px">
+        <label class="field" id="nameField" hidden>Your name
+          <input class="input" id="authName" autocomplete="given-name" maxlength="80" placeholder="What should we call you?" /></label>
+        <label class="field">Email
+          <input class="input" id="authEmail" type="email" autocomplete="email" required maxlength="254" /></label>
+        <label class="field">Password
+          <input class="input" id="authPassword" type="password" autocomplete="current-password" required minlength="8" maxlength="128" placeholder="8 characters or more" /></label>
+        <div class="err" id="authErr" role="alert"></div>
+        <button class="btn" id="authBtn" type="submit" style="justify-content:center">Log in</button>
+      </form>
+      <div class="or">or</div>
+      <button class="btn quiet" style="justify-content:center" onclick="startDemo(this)">Try it with sample data</button>
+      <p class="muted small" style="margin:0">The sample is private to you and deleted after 24 hours. No email needed.</p>
+    </div>
+  </section>
+</main>
 
 <!-- ================= APP ================= -->
-<div id="appView" hidden>
-  <header>
-    <h1>AI Execution Planner</h1>
-    <div class="row">
-      <span class="muted" id="whoami"></span>
-      <button class="ghost small" onclick="logout()">Log out</button>
+<div id="appView" class="app" hidden>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div><span>AI Execution Planner</span></div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button role="tab" id="tab-today" aria-selected="true" onclick="showView('today')">Today</button>
+      <button role="tab" id="tab-goals" aria-selected="false" onclick="showView('goals')">Goals</button>
+    </nav>
+    <div class="who">
+      <span class="muted small" id="whoName"></span>
+      <button class="avatar" id="avatar" onclick="openSettings()" aria-label="Settings"></button>
     </div>
   </header>
 
-  <div class="banner" id="guestBanner" hidden>
-    You're in a demo sandbox with sample data (deleted after 24h). <a href="#" onclick="logout();setTab('signup');return false">Sign up</a> to keep your own plan.
+  <div class="notice" id="guestNotice" hidden>
+    <span>You're exploring sample data. Sign up to keep your own plan and get it by email each morning.</span>
+    <button class="btn small" onclick="logout(true)">Sign up</button>
+  </div>
+  <div class="notice" id="verifyNotice" hidden>
+    <span>Confirm your email to get your plan each morning. We sent a link to <b id="verifyEmail"></b>.</span>
+    <button class="btn small quiet" onclick="resendVerification(this)">Send the link again</button>
   </div>
 
-  <section>
-    <div class="row" style="justify-content:space-between">
-      <h2 style="margin:0">Today's plan</h2>
-      <span class="muted" id="capacity"></span>
+  <!-- ---------- TODAY ---------- -->
+  <section id="view-today">
+    <div class="day-head">
+      <div>
+        <h1 id="dayTitle">Today</h1>
+        <p id="daySummary"></p>
+      </div>
+      <div class="actions">
+        <button class="btn quiet" onclick="openBusy()">Block out time</button>
+        <button class="btn" id="planBtn" onclick="planDay()">Plan my day</button>
+      </div>
     </div>
-    <div class="row" style="margin-top:10px">
-      <button onclick="generatePlan(this)">Generate plan</button>
-      <button class="ghost" onclick="loadPlan()">Refresh</button>
+
+    <div class="checkin" id="checkin" hidden></div>
+
+    <div class="today">
+      <div class="timeline-wrap">
+        <div class="tl-legend" aria-hidden="true">
+          <span><i class="dot high"></i>High focus</span>
+          <span><i class="dot medium"></i>Steady</span>
+          <span><i class="dot low"></i>Light</span>
+          <span><i class="busy-swatch"></i>Busy</span>
+          <span style="margin-left:auto">Click the timeline to block out time</span>
+        </div>
+        <div class="tl-scroll" id="tlScroll">
+          <div class="tl">
+            <div class="tl-hours" id="tlHours"></div>
+            <div class="tl-grid" id="tlGrid" aria-label="Today's timeline"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="panel" id="focusPanel">
+          <div id="focusPick">
+            <h2>What should I do now?</h2>
+            <p class="muted">Tell it how long you have and how you feel.</p>
+            <div class="focus-pick">
+              <div class="chips" id="minChips" role="group" aria-label="Minutes free"></div>
+              <div class="chips" id="energyChips" role="group" aria-label="Energy">
+                <button class="chip e-high" data-e="high" aria-pressed="false">Sharp</button>
+                <button class="chip e-medium" data-e="medium" aria-pressed="true">Steady</button>
+                <button class="chip e-low" data-e="low" aria-pressed="false">Tired</button>
+              </div>
+              <button class="btn" onclick="suggest()" style="justify-content:center">Suggest a task</button>
+            </div>
+            <div class="suggestion" id="suggestion" hidden></div>
+          </div>
+          <div class="timer" id="focusTimer" hidden>
+            <p class="muted small" style="margin:0">Focusing on</p>
+            <h3 id="timerTask"></h3>
+            <div class="ring">
+              <svg width="188" height="188" viewBox="0 0 188 188" aria-hidden="true">
+                <circle class="track" cx="94" cy="94" r="84" fill="none" stroke-width="10" />
+                <circle class="bar" id="ringBar" cx="94" cy="94" r="84" fill="none" stroke-width="10" stroke-dasharray="527.8" stroke-dashoffset="0" />
+              </svg>
+              <div class="clock"><b id="timerClock">25:00</b><span id="timerSub">remaining</span></div>
+            </div>
+            <div class="actions" style="justify-content:center">
+              <button class="btn quiet" id="pauseBtn" onclick="togglePause()">Pause</button>
+              <button class="btn" onclick="finishFocus()">I'm done</button>
+            </div>
+            <button class="btn small quiet" onclick="stopFocus()">Stop without saving</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="row" style="justify-content:space-between;align-items:baseline">
+            <h2 style="flex:none">Goals</h2>
+            <button class="btn small quiet" style="flex:none" onclick="showView('goals')">Manage goals</button>
+          </div>
+          <div class="goal-mini" id="goalMini"></div>
+        </div>
+      </aside>
     </div>
-    <ul id="planList"></ul>
   </section>
 
-  <section>
-    <h2>What should I do now?</h2>
-    <div class="row">
-      <input id="freeMin" type="number" min="5" max="720" value="30" style="width:90px" aria-label="minutes free" />
-      <span class="muted">minutes free, energy</span>
-      <select id="energy" aria-label="energy"><option>high</option><option selected>medium</option><option>low</option></select>
-      <button onclick="whatNow()">Ask</button>
-    </div>
-    <div class="result" id="whatNowResult"></div>
-  </section>
-
-  <section>
-    <h2>Goals</h2>
-    <form class="row" onsubmit="addGoal(event)">
-      <input id="goalTitle" class="grow" placeholder="e.g. Learn GenAI in 3 months" required maxlength="200" />
-      <input id="goalDeadline" type="date" aria-label="deadline" />
-      <label class="muted"><input type="checkbox" id="autoDecompose" checked /> break down with AI <span id="aiLeft"></span></label>
-      <button id="goalBtn" type="submit">Add goal</button>
-    </form>
-    <ul id="goalList"></ul>
-  </section>
-
-  <section>
-    <h2>Busy time today</h2>
-    <form class="row" onsubmit="addCal(event)">
-      <input id="calStart" type="time" required aria-label="start" />
-      <span class="muted">to</span>
-      <input id="calEnd" type="time" required aria-label="end" />
-      <input id="calTitle" class="grow" placeholder="Meeting, commute, lunch…" maxlength="120" />
-      <button type="submit">Add</button>
-    </form>
-    <ul id="calList"></ul>
-  </section>
-
-  <section>
-    <h2>Notifications (phone + laptop)</h2>
-    <p class="muted" style="margin-top:0">Get your plan each morning and goal-risk warnings in the evening via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a>. Pick a hard-to-guess topic, subscribe to it in the ntfy app and at ntfy.sh/&lt;topic&gt;, then connect it here.</p>
-    <form class="row" onsubmit="setupNotif(event)">
-      <input id="topic" class="grow" placeholder="e.g. anu-planner-8f21ac" pattern="[A-Za-z0-9_\-]{8,64}" required />
-      <button type="submit">Connect</button>
-      <button type="button" class="ghost" id="disconnectBtn" onclick="disconnectNotif()" hidden>Disconnect</button>
-    </form>
-    <p class="muted" id="notifStatus"></p>
-  </section>
-
-  <section>
-    <h2>Account</h2>
-    <div class="row">
-      <span class="muted">Timezone: <span id="tzLabel"></span></span>
-      <button class="ghost small" onclick="syncTimezone()">Use this device's timezone</button>
-      <button class="ghost small danger" onclick="deleteAccount()">Delete account & data</button>
+  <!-- ---------- GOALS ---------- -->
+  <section id="view-goals" hidden>
+    <div class="day-head"><div><h1>Goals</h1><p>Big things, broken into steps that fit your days.</p></div></div>
+    <div class="goals-layout">
+      <div class="panel new-goal" id="goalPanel">
+        <div id="goalForm">
+          <h2>What do you want to achieve?</h2>
+          <form onsubmit="startChat(event)">
+            <input class="input" id="goalTitle" required maxlength="200" placeholder="Read Atomic Habits, run a 10K, pass the GRE…" />
+            <label class="field">Deadline (optional)
+              <input class="input" id="goalDeadline" type="date" /></label>
+            <p class="small muted" id="aiNote" style="margin:0"></p>
+            <button class="btn" id="goalBtn" type="submit" style="justify-content:center">Start planning</button>
+          </form>
+        </div>
+        <div class="chat" id="goalChat" hidden>
+          <div class="chat-head">
+            <div style="min-width:0"><span class="kind" id="chatKind"></span><h2 id="chatTitle"></h2></div>
+            <button class="icon-btn" onclick="closeChat()" aria-label="Close the chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </div>
+          <div class="chat-log" id="chatLog" aria-live="polite"></div>
+          <div class="quick" id="chatQuick"></div>
+          <form class="chat-input" onsubmit="sendChat(event)">
+            <input class="input" id="chatText" maxlength="1000" placeholder="Type your answer" aria-label="Your answer" autocomplete="off" />
+            <button class="btn" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+      <div class="goal-list" id="goalList"></div>
     </div>
   </section>
 </div>
 
-<footer class="muted">Built with FastAPI, PostgreSQL and Claude · <a href="/docs">API docs</a></footer>
-</div>
-<div id="toast" role="status"></div>
+<!-- ================= SETTINGS DRAWER ================= -->
+<dialog class="drawer" id="settings" aria-labelledby="settingsTitle">
+  <div class="drawer-inner">
+    <div class="drawer-head"><h2 id="settingsTitle">Settings</h2>
+      <button class="icon-btn" onclick="settings.close()" aria-label="Close settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+
+    <section>
+      <h3>You</h3>
+      <label class="field">Name
+        <div class="row"><input class="input" id="setName" maxlength="80" /><button class="btn small quiet" style="flex:none" onclick="saveName()">Save</button></div></label>
+      <div class="row" style="justify-content:space-between">
+        <span class="small muted" style="flex:1 1 auto">Timezone: <b id="tzLabel" style="color:var(--ink)"></b></span>
+        <button class="btn small quiet" style="flex:none" onclick="syncTimezone()">Use this device's</button>
+      </div>
+    </section>
+    <div class="sep"></div>
+
+    <section>
+      <h3>Your week</h3>
+      <div class="field">Do your days usually look alike?
+        <div class="chips" id="patternChips" role="group" aria-label="Day pattern">
+          <button class="chip" data-p="steady" onclick="savePattern('steady')">Mostly the same: plan ahead</button>
+          <button class="chip" data-p="varies" onclick="savePattern('varies')">They vary: ask me each morning</button>
+        </div></div>
+      <div id="routineList"></div>
+      <p class="small muted" style="margin:0">Add office, college or gym from <b>Block out time</b> on Today and I'll ask how often it happens.</p>
+      <div class="field">Days off and leave
+        <div class="row"><input class="input" type="date" id="offDate" aria-label="Day off" /><button class="btn small quiet" style="flex:none" onclick="addDayOff()">Add day off</button></div></div>
+      <div id="daysOffList"></div>
+    </section>
+    <div class="sep"></div>
+
+    <section id="emailSection">
+      <h3>Email</h3>
+      <div id="emailGuest" class="small muted" hidden>Demo accounts don't get email. Sign up to get your plan each morning.</div>
+      <div id="emailOff" class="small muted" hidden>Email isn't set up on this server yet, so nothing will be sent.</div>
+      <div id="emailOn">
+        <div class="small muted">Sent to <b id="setEmail" style="color:var(--ink)"></b></div>
+        <div class="status" id="emailStatus"></div>
+        <div class="bounced" id="bouncedNote" hidden>Emails to this address keep bouncing, so we've stopped sending them.
+          <button class="btn small quiet" onclick="retryEmail(this)">It works now, try again</button></div>
+        <label class="switch"><span><b>Morning plan</b><br><span class="small muted">Your day's plan each morning</span></span>
+          <input type="checkbox" id="prefMorning" onchange="savePref('email_morning_plan', this)" /></label>
+        <label class="field" style="margin:-4px 0 4px">Send it at (your time)
+          <select class="input" id="prefHour" onchange="saveHour(this)">
+            <option value="6">6:00</option><option value="7">7:00</option><option value="8">8:00</option><option value="9">9:00</option>
+          </select></label>
+        <label class="switch"><span><b>Evening heads-up</b><br><span class="small muted">At 20:00, only when a goal is slipping</span></span>
+          <input type="checkbox" id="prefRisk" onchange="savePref('email_risk_alerts', this)" /></label>
+        <label class="switch"><span><b>Weekly ideas</b><br><span class="small muted">On Sundays: books and newsletters picked for your goals</span></span>
+          <input type="checkbox" id="prefDigest" onchange="savePref('email_weekly_digest', this)" /></label>
+        <div class="actions">
+          <button class="btn small quiet" onclick="previewEmail()">Preview the email</button>
+          <button class="btn small" id="sendNowBtn" onclick="sendPlanNow(this)">Email me today's plan</button>
+        </div>
+      </div>
+    </section>
+    <div class="sep"></div>
+
+    <section>
+      <div class="actions">
+        <button class="btn quiet" onclick="logout()">Log out</button>
+        <button class="btn danger" onclick="deleteAccount()">Delete account</button>
+      </div>
+      <p class="small muted" style="margin:0"><a href="/docs">API documentation</a></p>
+    </section>
+  </div>
+</dialog>
+
+<!-- ================= BUSY TIME DIALOG ================= -->
+<dialog class="modal" id="busyDialog" aria-labelledby="busyTitle">
+  <form method="dialog" id="busyStep1" onsubmit="saveBusy(event)">
+    <h2 id="busyTitle">Block out time</h2>
+    <p class="muted small" style="margin:0">Plans will work around it.</p>
+    <label class="field">What is it?
+      <input class="input" id="busyName" maxlength="120" placeholder="Class, commute, lunch…" /></label>
+    <div class="row">
+      <label class="field">From <input class="input" id="busyStart" type="time" required /></label>
+      <label class="field">To <input class="input" id="busyEnd" type="time" required /></label>
+    </div>
+    <div class="actions" style="justify-content:flex-end">
+      <button class="btn quiet" type="button" onclick="busyDialog.close()">Cancel</button>
+      <button class="btn" type="submit">Block out time</button>
+    </div>
+  </form>
+  <div class="step2" id="busyStep2" hidden>
+    <h2 id="followTitle">Does this happen regularly?</h2>
+    <div class="chips" id="repeatChips" role="group" aria-label="How often">
+      <button class="chip" data-r="once" aria-pressed="true">Just today</button>
+      <button class="chip" data-r="weekly" aria-pressed="false">Every week</button>
+      <button class="chip" data-r="ondemand" aria-pressed="false" id="onDemandChip">Only on days I go</button>
+    </div>
+    <div class="field" id="repeatDays" hidden>On which days?
+      <div class="chips daypick" id="dayChips"></div></div>
+    <div class="field" id="satBox" hidden>Any working Saturdays?
+      <div class="chips" id="satChips">
+        <button class="chip" data-s="none" aria-pressed="true">No</button>
+        <button class="chip" data-s="all" aria-pressed="false">Every Saturday</button>
+        <button class="chip" data-s="some" aria-pressed="false">Some Saturdays</button>
+      </div>
+      <div class="chips daypick" id="satWeeks" hidden></div></div>
+    <label class="field" id="noteBox" hidden>What do you train? (optional)
+      <input class="input" id="routineNote" maxlength="300" placeholder="Mon legs, Wed upper body, Fri cardio" /></label>
+    <p class="small muted" id="followHint" style="margin:0"></p>
+    <div class="actions" style="justify-content:flex-end">
+      <button class="btn" onclick="saveRoutine(this)">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= EMAIL PREVIEW ================= -->
+<dialog class="preview" id="previewDialog" aria-label="Email preview">
+  <div class="bar"><b>Tomorrow morning's email, as it looks today</b>
+    <button class="icon-btn" onclick="previewDialog.close()" aria-label="Close preview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <iframe id="previewFrame" title="Email preview"></iframe>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const $ = id => document.getElementById(id);
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-let me = null, authMode = 'login';
+const DAY_START = 7, DAY_END = 23;
+const ENERGY = {high: 'High focus', medium: 'Steady', low: 'Light'};
+const PROVIDERS = {azure: 'Azure AI Foundry', gemini: 'Gemini'};
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let me = null, authMode = 'login', minutesFree = 30, energyNow = 'medium';
+let state = {plan: [], blocks: [], goals: [], tasks: [], cap: 0, day: null};
+const KIND_NAMES = {book: 'Book', fitness: 'Fitness', course: 'Course', exam: 'Exam', habit: 'Habit', general: 'Goal'};
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const store = {get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
+               set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }};
 
-// Escape everything user-controlled before it touches innerHTML.
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toMin = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+const toHHMM = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const hm = m => m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ' ' + (m % 60) + 'm' : ''}` : `${m} min`;
+const hourPx = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hour')) || 56;
 
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3500);
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3800);
 }
 
 async function api(path, opts = {}) {
@@ -199,22 +666,30 @@ async function api(path, opts = {}) {
   });
   let data = null;
   try { data = await res.json(); } catch (_) {}
-  if (res.status === 401 && !path.startsWith('/auth/')) { showAuth(); throw new Error('Please log in.'); }
+  if (res.status === 401 && !path.startsWith('/auth/')) { showAuth(); throw new Error('Please log in again.'); }
   if (!res.ok) {
     let d = data && data.detail;
-    if (Array.isArray(d)) d = d.map(e => (e.loc ? e.loc.slice(-1)[0] + ': ' : '') + e.msg).join('; ');
-    throw new Error(d || `Request failed (${res.status})`);
+    if (Array.isArray(d)) d = d.map(e => e.msg).join('; ');
+    throw new Error(d || `Something went wrong (${res.status}). Try again.`);
   }
   return data;
 }
-const run = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message); } };
+const run = fn => async (...a) => { try { return await fn(...a); } catch (e) { toast(e.message); } };
 
-// ---------- auth ----------
+// user-local clock, in the account's timezone
+function nowParts() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {timeZone: me.timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit'}).formatToParts(new Date()).map(x => [x.type, x.value]));
+  return {date: `${p.year}-${p.month}-${p.day}`, minutes: (+p.hour % 24) * 60 + +p.minute};
+}
+
+// ================= AUTH =================
 function setTab(mode) {
   authMode = mode;
-  $('tabLogin').classList.toggle('on', mode === 'login');
-  $('tabSignup').classList.toggle('on', mode === 'signup');
-  $('authName').hidden = mode !== 'signup';
+  $('tabLogin').setAttribute('aria-selected', mode === 'login');
+  $('tabSignup').setAttribute('aria-selected', mode === 'signup');
+  $('nameField').hidden = mode !== 'signup';
+  $('authTitle').textContent = mode === 'signup' ? 'Make your planner' : 'Welcome back';
   $('authBtn').textContent = mode === 'signup' ? 'Create account' : 'Log in';
   $('authPassword').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
   $('authErr').textContent = '';
@@ -228,142 +703,606 @@ async function submitAuth(e) {
     me = await api('/auth/' + authMode, {method: 'POST', body});
     $('authPassword').value = '';
     showApp();
+    if (authMode === 'signup') toast(me.email_enabled ? `Welcome! Check ${me.email} for a link to confirm it.` : 'Welcome! Add your first goal to get started.');
   } catch (err) { $('authErr').textContent = err.message; }
   finally { $('authBtn').disabled = false; }
 }
-async function startDemo() {
+async function startDemo(btn) {
+  btn.disabled = true;
   try {
     me = await api('/auth/demo', {method: 'POST', body: {timezone: TZ}});
     await api('/plan/generate', {method: 'POST'});
-    showApp();
+    showApp(true);
   } catch (err) { $('authErr').textContent = err.message; }
+  finally { btn.disabled = false; }
 }
-const logout = run(async () => { await api('/auth/logout', {method: 'POST'}); me = null; showAuth(); });
-const deleteAccount = run(async () => {
-  if (!confirm('Delete your account and all your goals, tasks and plans? This cannot be undone.')) return;
-  await api('/auth/me', {method: 'DELETE'}); me = null; showAuth(); toast('Account deleted.');
+const logout = run(async (toSignup) => {
+  await api('/auth/logout', {method: 'POST'}); me = null; settings.close();
+  stopFocus(true); showAuth(); if (toSignup) setTab('signup');
 });
-const syncTimezone = run(async () => { me = await api('/auth/me', {method: 'PATCH', body: {timezone: TZ}}); renderMe(); toast('Timezone set to ' + TZ); refreshAll(); });
+const deleteAccount = run(async () => {
+  if (!confirm('Delete your account, goals, tasks and plans? This can\'t be undone.')) return;
+  await api('/auth/me', {method: 'DELETE'}); me = null; settings.close(); showAuth(); toast('Your account and data are deleted.');
+});
 
-function showAuth() { $('appView').hidden = true; $('authView').hidden = false; }
-function showApp() { $('authView').hidden = true; $('appView').hidden = false; renderMe(); refreshAll(); }
+function showAuth() { $('appView').hidden = true; $('authView').hidden = false; document.title = 'AI Execution Planner'; }
+function showApp(animate) {
+  $('authView').hidden = true; $('appView').hidden = false;
+  renderMe(); showView('today'); refreshAll(animate);
+}
 function renderMe() {
-  $('whoami').textContent = me.is_guest ? 'Guest' : (me.name || me.email);
-  $('guestBanner').hidden = !me.is_guest;
+  const first = (me.name || me.email || 'You').split(' ')[0];
+  $('whoName').textContent = me.is_guest ? 'Sample data' : first;
+  $('avatar').textContent = me.is_guest ? '?' : first[0].toUpperCase();
+  $('guestNotice').hidden = !me.is_guest;
+  $('verifyNotice').hidden = me.is_guest || !me.email_enabled || me.email_verified;
+  $('verifyEmail').textContent = me.email || '';
+  $('aiNote').textContent = me.ai_daily_limit && me.ai_calls_left_today
+    ? `I'll ask a few questions, look things up, and plan it with you (${me.ai_providers.map(p => PROVIDERS[p] || p).join(' or ')}; ${me.ai_calls_left_today} of ${me.ai_daily_limit} AI chats left today).`
+    : 'I\'ll ask a few quick questions and plan it around your week.';
+  $('prefDigest').checked = me.email_weekly_digest; $('prefDigest').disabled = !me.email_verified;
+  [...$('patternChips').children].forEach(c => c.setAttribute('aria-pressed', c.dataset.p === me.day_pattern));
+  // settings
+  $('setName').value = me.name || '';
   $('tzLabel').textContent = me.timezone;
-  $('aiLeft').textContent = me.ai_daily_limit ? `(${me.ai_calls_left_today}/${me.ai_daily_limit} left today)` : '(AI off: uses a template)';
-  $('notifStatus').textContent = me.notifications_connected ? 'Connected. You will get morning plans and risk alerts.' : 'Not connected.';
-  $('disconnectBtn').hidden = !me.notifications_connected;
+  $('emailGuest').hidden = !me.is_guest;
+  $('emailOff').hidden = me.is_guest || me.email_enabled;
+  $('emailOn').hidden = me.is_guest || !me.email_enabled;
+  $('setEmail').textContent = me.email || '';
+  $('emailStatus').className = 'status ' + (me.email_verified ? 'ok' : 'wait');
+  $('emailStatus').innerHTML = me.email_verified ? '<span aria-hidden="true">●</span> Confirmed'
+    : '<span aria-hidden="true">●</span> Waiting for you to confirm it <button class="btn small quiet" onclick="resendVerification(this)">Resend link</button>';
+  $('prefMorning').checked = me.email_morning_plan; $('prefRisk').checked = me.email_risk_alerts;
+  $('prefHour').value = String(me.email_morning_hour || 7);
+  $('prefMorning').disabled = $('prefRisk').disabled = !me.email_verified;
+  $('prefHour').disabled = !me.email_verified || !me.email_morning_plan;
+  $('bouncedNote').hidden = !me.email_bounced;
+  $('sendNowBtn').disabled = !me.email_verified;
 }
 async function refreshMe() { me = await api('/auth/me'); renderMe(); }
-function refreshAll() { loadPlan(); loadGoals(); loadCal(); }
 
-// ---------- plan ----------
-const loadPlan = run(async () => {
-  const [items, cap] = await Promise.all([api('/plan'), api('/capacity')]);
-  $('capacity').textContent = `${Math.floor(cap.free_minutes / 60)}h ${cap.free_minutes % 60}m free left today`;
-  $('planList').innerHTML = items.length ? items.map(i => {
-    const done = i.task_status === 'done';
-    return `<li class="${done ? 'done' : ''}">
-      <span class="time">${esc(i.start)}–${esc(i.end)}</span>
-      <span class="title">${esc(i.task)}</span>
-      <span class="chip ${esc(i.energy)}">${esc(i.energy)}</span>
-      ${done ? '<span class="chip okc">done</span>' : `
-        <button class="small" onclick="markDone(${i.task_id})">Done</button>
-        <button class="small ghost" onclick="skipTask(${i.task_id})">Skip</button>`}
-    </li>`;
-  }).join('') : '<li class="muted">No plan yet. Add goals or tasks, then Generate plan.</li>';
+function showView(v) {
+  for (const name of ['today', 'goals']) {
+    $('view-' + name).hidden = name !== v;
+    $('tab-' + name).setAttribute('aria-selected', name === v);
+  }
+  if (v === 'today') requestAnimationFrame(scrollToNow);
+}
+
+// ================= DATA =================
+const refreshAll = run(async (animate) => {
+  const [plan, blocks, cap, goals, tasks, day] = await Promise.all([
+    api('/plan'), api('/calendar'), api('/capacity'), api('/goals'), api('/tasks'), api('/days/' + nowParts().date)]);
+  state = {plan, blocks, cap: cap.free_minutes, goals, tasks, day};
+  renderToday(animate); renderGoals();
 });
-const generatePlan = run(async (btn) => {
-  btn.disabled = true;
-  try { const r = await api('/plan/generate', {method: 'POST'}); toast(`Scheduled ${r.scheduled} block(s).`); await loadPlan(); }
-  finally { btn.disabled = false; }
+
+// ================= TODAY =================
+function renderToday(animate) {
+  const fmt = new Intl.DateTimeFormat('en-GB', {timeZone: me.timezone, weekday: 'long', day: 'numeric', month: 'long'});
+  $('dayTitle').textContent = fmt.format(new Date());
+  const pending = state.plan.filter(i => i.task_status !== 'done');
+  const done = state.plan.filter(i => i.task_status === 'done').length;
+  $('daySummary').innerHTML = state.plan.length
+    ? `You have <b>${esc(hm(state.cap))}</b> free and <b>${pending.length}</b> block${pending.length === 1 ? '' : 's'} left${done ? `, with <b>${done}</b> done already` : ''}.`
+    : `You have <b>${esc(hm(state.cap))}</b> free. Press Plan my day to fill it with your goals.`;
+  renderCheckin();
+  renderTimeline(animate);
+  renderGoalMini();
+}
+
+// ---------- how does today look? ----------
+const DAY_KINDS = [['usual', 'A usual day'], ['light', 'Busy, keep it light'], ['off', 'Day off or on leave']];
+function renderCheckin() {
+  const d = state.day, box = $('checkin');
+  if (!d) { box.hidden = true; return; }
+  const askPattern = !me.is_guest && !store.get('askedPattern');
+  const going = d.on_demand.map(r => r.going
+    ? `<span>${esc(r.title)} ${esc(r.start)}–${esc(r.end)} is blocked.</span>`
+    : `<span>Going to ${esc(r.title)} today?</span><button class="btn small quiet" onclick="goingToday(${r.id})">Yes, block ${esc(r.start)}–${esc(r.end)}</button>`).join('');
+  const chips = DAY_KINDS.map(([k, label]) =>
+    `<button class="chip" aria-pressed="${d.status === k}" onclick="setDay('${k}')">${label}</button>`).join('');
+  let html;
+  if (d.needs_checkin) {
+    html = `<div class="checkin-row"><div><h2>How does today look?</h2>
+      <p class="small muted" style="margin:2px 0 0">Your days vary, so I plan each one once you tell me.</p></div>
+      <div class="chips">${chips}</div></div>`;
+  } else if (askPattern) {
+    html = `<div class="checkin-row"><div><h2>Do your days usually look alike?</h2>
+      <p class="small muted" style="margin:2px 0 0">If they vary (shifts, some working Saturdays, travel), I'll ask each morning instead of planning ahead.</p></div>
+      <div class="chips"><button class="chip" onclick="savePattern('steady', true)">Mostly the same</button>
+      <button class="chip" onclick="savePattern('varies', true)">They vary</button></div></div>`;
+  } else {
+    html = `<div class="checkin-row"><span class="small muted">Today is</span><div class="chips">${chips}</div></div>`;
+  }
+  if (going) html += `<div class="going">${going}</div>`;
+  box.innerHTML = html;
+  box.classList.toggle('ask', !!(d.needs_checkin || askPattern));
+  box.hidden = false;
+}
+const setDay = run(async (kind) => {
+  state.day = await api('/days/' + nowParts().date, {method: 'PUT', body: {kind}});
+  const r = await api('/plan/generate', {method: 'POST'});
+  await refreshAll(true);
+  toast({usual: `Planned ${r.scheduled} block${r.scheduled === 1 ? '' : 's'} around your usual day.`,
+         light: `Kept it light: ${r.scheduled} block${r.scheduled === 1 ? '' : 's'}, most important first.`,
+         off: 'Enjoy the day off. Work and classes are cleared for today.'}[kind]);
 });
-const markDone = run(async (id) => {
-  const mins = prompt('How many minutes did it actually take? (helps future estimates; leave blank to skip)');
+const goingToday = run(async (id) => {
+  await api(`/routines/${id}/going`, {method: 'POST'});
+  if (state.plan.some(p => p.task_status !== 'done')) await api('/plan/generate', {method: 'POST'});
+  await refreshAll(); toast('Blocked, and today\'s plan moved around it.');
+});
+
+function renderTimeline(animate) {
+  const H = hourPx();
+  $('tlHours').innerHTML = Array.from({length: DAY_END - DAY_START + 1}, (_, i) =>
+    `<div>${String(DAY_START + i).padStart(2, '0')}:00</div>`).join('');
+  const grid = $('tlGrid');
+  grid.style.height = `${(DAY_END - DAY_START) * H}px`;
+  const y = m => (m - DAY_START * 60) / 60 * H;
+  const now = nowParts().minutes;
+  let html = now > DAY_START * 60 ? `<div class="past" style="height:${y(Math.min(now, DAY_END * 60))}px"></div>` : '';
+  for (const b of state.blocks) {
+    const top = y(toMin(b.start)), h = Math.max(y(toMin(b.end)) - top - 2, 6);
+    html += `<div class="blk busy ${h < 16 ? 'micro' : h < 34 ? 'tiny' : ''}" style="top:${top}px;height:${h}px" title="${esc(b.title)}, ${esc(b.start)}–${esc(b.end)}">
+      <div><div class="t">${esc(b.title)}</div><div class="m">${esc(b.start)}–${esc(b.end)}${b.source === 'routine' ? ', every week' : ''}</div></div>
+      <div class="blk-actions">${b.source === 'routine'
+        ? `<button onclick="skipRoutine(${b.id})" aria-label="Not today: ${esc(b.title)}">Not today</button>`
+        : `<button onclick="deleteBusy(${b.id})" aria-label="Remove ${esc(b.title)}">Remove</button>`}</div></div>`;
+  }
+  state.plan.forEach((p, i) => {
+    const top = y(toMin(p.start)), h = Math.max(y(toMin(p.end)) - top - 2, 6);
+    const done = p.task_status === 'done', e = p.energy || 'medium';
+    html += `<div class="blk task ${e} ${done ? 'done' : ''} ${h < 16 ? 'micro' : h < 34 ? 'tiny' : ''}" style="top:${top}px;height:${h}px;--i:${i}" title="${esc(p.task)}, ${esc(p.start)}–${esc(p.end)}">
+      <div><div class="t">${esc(p.task)}</div><div class="m">${esc(p.start)}–${esc(p.end)}, ${ENERGY[e]}</div></div>
+      ${done ? '<div class="blk-actions static"><span class="m">Done</span></div>' : `<div class="blk-actions">
+        <button class="go" onclick="startFocus(${p.task_id})">Start</button>
+        <button onclick="markDone(${p.task_id}, this)">Done</button>
+        <button onclick="skipTask(${p.task_id})">Skip</button></div>`}</div>`;
+  });
+  if (now >= DAY_START * 60 && now <= DAY_END * 60)
+    html += `<div class="now" style="top:${y(now)}px"><span>${toHHMM(now)}</span></div>`;
+  if (!state.plan.length)
+    html += `<div class="tl-empty"><h3>Your day is open</h3><p class="muted" style="margin:0">${state.goals.length
+      ? 'Press Plan my day and your goals will be fitted around your busy time.'
+      : 'Add a goal first, then press Plan my day.'}</p></div>`;
+  grid.innerHTML = html;
+  grid.parentElement.classList.toggle('planning', !!animate && !reduceMotion);
+}
+
+function scrollToNow() {
+  const now = nowParts && me ? nowParts().minutes : 9 * 60;
+  const top = Math.max((now - DAY_START * 60) / 60 * hourPx() - 80, 0);
+  const box = $('tlScroll');
+  if (box.scrollHeight > box.clientHeight + 4) box.scrollTop = top;   // phones scroll the page instead
+}
+
+$('tlGrid').addEventListener('click', e => {
+  const blk = e.target.closest('.blk');
+  if (blk && !e.target.closest('button')) {        // tap a block to show its buttons (phones)
+    document.querySelectorAll('.blk.open').forEach(b => b !== blk && b.classList.remove('open'));
+    blk.classList.toggle('open'); return;
+  }
+  if (e.target !== e.currentTarget) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  let m = DAY_START * 60 + Math.floor((e.clientY - rect.top) / hourPx() * 4) * 15;
+  m = Math.min(Math.max(m, DAY_START * 60), DAY_END * 60 - 30);
+  openBusy(m);
+});
+
+const planDay = run(async () => {
+  const btn = $('planBtn'); btn.disabled = true; btn.textContent = 'Planning…';
+  try {
+    const r = await api('/plan/generate', {method: 'POST'});
+    await refreshAll(true);
+    toast(r.scheduled ? `Planned ${r.scheduled} block${r.scheduled === 1 ? '' : 's'} around your busy time.` : 'Nothing left to plan today. Add a goal or a task.');
+    scrollToNow();
+  } finally { btn.disabled = false; btn.textContent = 'Plan my day'; }
+});
+
+function burst(el) {
+  if (reduceMotion || !el) return;
+  const r = el.getBoundingClientRect(), colors = ['#E8962E', '#2B9C93', '#6A5FC8'];
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement('i'); s.className = 'burst';
+    const a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 50;
+    s.style.cssText = `left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;background:${colors[i % 3]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px`;
+    document.body.appendChild(s); setTimeout(() => s.remove(), 800);
+  }
+}
+const markDone = run(async (id, el, actual) => {
   const body = {status: 'done'};
-  if (mins && +mins > 0) body.actual_minutes = Math.round(+mins);
+  if (actual) body.actual_minutes = actual;
+  burst(el);
   await api(`/tasks/${id}`, {method: 'PATCH', body});
-  loadPlan(); loadGoals();
+  await refreshAll();
+  toast(actual ? `Done in ${hm(actual)}. Future plans will learn from that.` : 'Done. Nice work.');
 });
 const skipTask = run(async (id) => {
   await api(`/tasks/${id}`, {method: 'PATCH', body: {status: 'skipped'}});
-  toast('Skipped. Replanned today and tomorrow; it will rank higher next time.');
-  loadPlan();
+  await refreshAll(true);
+  toast('Skipped. Today and tomorrow are replanned, and it moves up the list.');
 });
 
-// ---------- what now ----------
-const whatNow = run(async () => {
-  const d = await api('/what-now', {method: 'POST', body: {free_minutes: parseInt($('freeMin').value) || 30, energy: $('energy').value}});
-  $('whatNowResult').textContent = d.task ? `→ ${d.task} (~${d.estimated_minutes} min)` : d.message;
-});
-
-// ---------- goals ----------
-const loadGoals = run(async () => {
-  const goals = await api('/goals');
-  if (!goals.length) { $('goalList').innerHTML = '<li class="muted">No goals yet.</li>'; return; }
-  const tasks = await api('/tasks');
-  $('goalList').innerHTML = goals.map(g => {
-    const gt = tasks.filter(t => t.goal_id === g.id);
-    const risk = g.risk ? `<span class="chip ${g.risk.at_risk ? 'risk' : 'okc'}" title="${esc(g.risk.detail)}">${g.risk.at_risk ? 'at risk' : 'on track'}</span>` : '';
-    return `<li>
-      <span class="title"><strong>${esc(g.title)}</strong>${g.deadline ? ` <span class="muted">· due ${esc(g.deadline)}</span>` : ''}</span>
-      ${risk}<span class="chip">${g.done}/${g.total} tasks</span>
-      <button class="small ghost danger" onclick="deleteGoal(${g.id})" aria-label="delete goal">✕</button>
-      <div class="bar"><span style="width:${+g.progress_pct}%"></span></div>
-      ${g.risk && g.risk.at_risk ? `<div class="muted" style="flex-basis:100%">${esc(g.risk.detail)}</div>` : ''}
-      <details style="flex-basis:100%"><summary>Tasks</summary><ul>${gt.map(t => `
-        <li class="${t.status === 'done' ? 'done' : ''}"><span class="title">${esc(t.title)}</span>
-          <span class="chip">${t.estimated_minutes}m</span><span class="chip ${esc(t.energy_required)}">${esc(t.energy_required)}</span>
-          <span class="chip">P${t.priority}</span></li>`).join('') || '<li class="muted">No tasks</li>'}
-      </ul></details>
-    </li>`;
-  }).join('');
-});
-const addGoal = run(async (e) => {
+// ---------- busy time ----------
+function openBusy(startMin) {
+  const now = nowParts().minutes;
+  const s = startMin ?? Math.min(Math.max(Math.ceil(now / 15) * 15, DAY_START * 60), DAY_END * 60 - 60);
+  $('busyStart').value = toHHMM(s); $('busyEnd').value = toHHMM(Math.min(s + 60, 23 * 60 + 59));
+  $('busyName').value = ''; busyDialog.showModal(); $('busyName').focus();
+}
+let follow = null;   // the block just saved, while we ask whether it repeats
+function busyKind(title) {
+  const t = title.toLowerCase();
+  if (/office|work|job|shift|meeting|stand-?up/.test(t)) return 'work';
+  if (/gym|workout|run|yoga|swim|sport|training|cricket|football|badminton/.test(t)) return 'gym';
+  if (/class|college|school|lecture|uni|tuition|coaching/.test(t)) return 'class';
+  if (/commute|travel|drive|bus|train|metro/.test(t)) return 'commute';
+  return 'other';
+}
+const saveBusy = run(async (e) => {
   e.preventDefault();
-  const btn = $('goalBtn'), auto = $('autoDecompose').checked;
-  btn.disabled = true; btn.textContent = auto ? 'Breaking down…' : 'Adding…';
+  const title = $('busyName').value.trim() || 'Busy';
+  const block = await api('/calendar', {method: 'POST', body: {date: nowParts().date, start_time: $('busyStart').value,
+    end_time: $('busyEnd').value, title}});
+  if (state.plan.some(p => p.task_status !== 'done')) await api('/plan/generate', {method: 'POST'});
+  refreshAll();
+  if (title === 'Busy' || me.is_guest) { busyDialog.close(); toast('Time blocked out.'); return; }
+  // follow-up: is this a regular thing?
+  const kind = busyKind(title), wd = (new Date(nowParts().date + 'T12:00').getDay() + 6) % 7;
+  follow = {id: block.id, title, kind, start: $('busyStart').value, end: $('busyEnd').value, repeat: 'once',
+            days: new Set(kind === 'work' || kind === 'class' || kind === 'commute' ? [0, 1, 2, 3, 4] : [wd]),
+            sat: 'none', weeks: new Set()};
+  $('followTitle').textContent = {work: `Is ${title} on the same days every week?`, gym: `Do you go to ${title} on set days?`,
+    class: `Is ${title} on the same days every week?`}[kind] || `Does ${title} happen regularly?`;
+  $('onDemandChip').hidden = !(kind === 'gym' || kind === 'other');
+  $('busyStep1').hidden = true; $('busyStep2').hidden = false;
+  renderFollow();
+});
+function renderFollow() {
+  const f = follow;
+  [...$('repeatChips').children].forEach(c => c.setAttribute('aria-pressed', c.dataset.r === f.repeat));
+  $('repeatDays').hidden = f.repeat !== 'weekly';
+  $('dayChips').innerHTML = DAY_SHORT.map((n, i) => (i === 5 && f.kind === 'work') ? '' :
+    `<button class="chip" data-d="${i}" aria-pressed="${f.days.has(i)}">${n}</button>`).join('');
+  $('satBox').hidden = !(f.repeat === 'weekly' && f.kind === 'work');
+  [...$('satChips').children].forEach(c => c.setAttribute('aria-pressed', c.dataset.s === f.sat));
+  $('satWeeks').hidden = f.sat !== 'some';
+  $('satWeeks').innerHTML = [1, 2, 3, 4, 5].map(w => `<button class="chip" data-w="${w}" aria-pressed="${f.weeks.has(w)}">${['1st', '2nd', '3rd', '4th', '5th'][w - 1]}</button>`).join('');
+  $('noteBox').hidden = !(f.kind === 'gym' && f.repeat !== 'once');
+  $('followHint').textContent = f.repeat === 'ondemand' ? `I'll ask "Going to ${f.title} today?" each day, so it's only blocked when you go.`
+    : f.repeat === 'weekly' ? 'It\'ll be blocked automatically on those days. On leave days, tap "Day off" on Today and it\'s cleared.' : '';
+}
+$('repeatChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; follow.repeat = b.dataset.r; renderFollow(); });
+$('dayChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return;
+  const d = +b.dataset.d; follow.days.has(d) ? follow.days.delete(d) : follow.days.add(d); renderFollow(); });
+$('satChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; follow.sat = b.dataset.s; renderFollow(); });
+$('satWeeks').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return;
+  const w = +b.dataset.w; follow.weeks.has(w) ? follow.weeks.delete(w) : follow.weeks.add(w); renderFollow(); });
+busyDialog.addEventListener('close', () => { $('busyStep1').hidden = false; $('busyStep2').hidden = true; follow = null; });
+
+const saveRoutine = run(async (btn) => {
+  const f = follow;
+  if (f.repeat === 'once') { busyDialog.close(); toast('Time blocked out for today.'); return; }
+  btn.disabled = true;
   try {
-    const r = await api('/goals', {method: 'POST', body: {title: $('goalTitle').value, deadline: $('goalDeadline').value || null, auto_decompose: auto}});
-    $('goalTitle').value = '';
-    if (auto) toast(r.note ? `${r.note} Created ${r.tasks_created} tasks.` : `AI created ${r.tasks_created} tasks.`);
-    await Promise.all([loadGoals(), refreshMe()]);
-  } finally { btn.disabled = false; btn.textContent = 'Add goal'; }
+    const base = {title: f.title, kind: f.kind, start_time: f.start, end_time: f.end, note: $('routineNote').value.trim()};
+    if (f.repeat === 'ondemand') {
+      await api('/routines', {method: 'POST', body: {...base, auto: false}});
+      toast(`Got it. I'll ask about ${f.title} each day.`);
+    } else {
+      const days = [...f.days].filter(d => !(f.kind === 'work' && d === 5));
+      if (f.sat === 'all') days.push(5);
+      if (!days.length && f.sat !== 'some') { toast('Pick at least one day.'); return; }
+      if (days.length) await api('/routines', {method: 'POST', body: {...base, weekdays: days, replaces_block_id: f.id}});
+      if (f.sat === 'some') {
+        if (!f.weeks.size) { toast('Pick which Saturdays.'); return; }
+        await api('/routines', {method: 'POST', body: {...base, weekdays: [5], weeks_of_month: [...f.weeks], replaces_block_id: days.length ? null : f.id}});
+      }
+      toast(`${f.title} is now part of your week. Plans will work around it.`);
+    }
+    busyDialog.close(); refreshAll();
+  } finally { btn.disabled = false; }
+});
+const skipRoutine = run(async (id) => {
+  await api(`/routines/${id}/skip`, {method: 'POST'});
+  if (state.plan.some(p => p.task_status !== 'done')) await api('/plan/generate', {method: 'POST'});
+  await refreshAll(); toast('Cleared for today, and your plan used the time.');
+});
+const deleteBusy = run(async (id) => { await api(`/calendar/${id}`, {method: 'DELETE'}); refreshAll(); toast('Busy time removed.'); });
+
+// ---------- what now + focus timer ----------
+$('minChips').innerHTML = [15, 30, 45, 60, 90].map(m => `<button class="chip" data-m="${m}" aria-pressed="${m === 30}">${m} min</button>`).join('');
+$('minChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return;
+  minutesFree = +b.dataset.m; [...$('minChips').children].forEach(c => c.setAttribute('aria-pressed', c === b)); });
+$('energyChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return;
+  energyNow = b.dataset.e; [...$('energyChips').children].forEach(c => c.setAttribute('aria-pressed', c === b)); });
+
+const suggest = run(async () => {
+  const d = await api('/what-now', {method: 'POST', body: {free_minutes: minutesFree, energy: energyNow}});
+  const box = $('suggestion'); box.hidden = false;
+  box.innerHTML = d.task
+    ? `<span class="small muted"><i class="dot ${esc(d.energy)}"></i> About ${d.estimated_minutes} min</span>
+       <h3>${esc(d.task)}</h3>
+       <div class="actions"><button class="btn" onclick="startFocus(${d.task_id})">Start focusing</button>
+       <button class="btn quiet" onclick="suggest()">Something else</button></div>`
+    : `<h3>Nothing left to do</h3><p class="muted small" style="margin:0">Enjoy the gap, or add a goal.</p>`;
+});
+
+let focus = null;   // {taskId, title, total, left, paused, iv, started}
+function startFocus(taskId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  stopFocus(true);
+  focus = {taskId, title: t.title, total: t.estimated_minutes * 60, left: t.estimated_minutes * 60, paused: false, worked: 0};
+  $('focusPick').hidden = true; $('focusTimer').hidden = false;
+  $('timerTask').textContent = t.title; $('pauseBtn').textContent = 'Pause';
+  showView('today'); $('focusPanel').scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'center'});
+  tick(); focus.iv = setInterval(tick, 1000);
+}
+function tick() {
+  if (!focus) return;
+  if (!focus.paused) { focus.left -= 1; focus.worked += 1; }
+  const over = focus.left < 0, s = Math.abs(focus.left);
+  const clock = `${over ? '+' : ''}${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  $('timerClock').textContent = clock;
+  $('timerSub').textContent = focus.paused ? 'paused' : over ? 'over the estimate' : 'remaining';
+  const C = 527.8, frac = Math.max(focus.left, 0) / focus.total;
+  $('ringBar').style.strokeDashoffset = C * (1 - frac);
+  $('ringBar').style.stroke = over ? 'var(--sun)' : 'var(--tide)';
+  document.title = `${clock} ${focus.title}`;
+}
+function togglePause() { if (!focus) return; focus.paused = !focus.paused; $('pauseBtn').textContent = focus.paused ? 'Resume' : 'Pause'; tick(); }
+function stopFocus(silent) {
+  if (focus) clearInterval(focus.iv);
+  focus = null; document.title = 'AI Execution Planner';
+  $('focusTimer').hidden = true; $('focusPick').hidden = false; $('suggestion').hidden = true;
+  if (silent !== true) toast('Focus stopped. Nothing was saved.');
+}
+function finishFocus() {
+  if (!focus) return;
+  const {taskId, worked} = focus;
+  // under a minute isn't a real measurement, so don't let it teach the estimator
+  const actual = worked >= 60 ? Math.round(worked / 60) : null;
+  stopFocus(true);
+  markDone(taskId, $('focusPanel'), actual);
+}
+
+// ================= GOALS =================
+function dueText(deadline) {
+  if (!deadline) return '';
+  const days = Math.round((new Date(deadline + 'T12:00') - new Date(nowParts().date + 'T12:00')) / 864e5);
+  return days < 0 ? `${-days} day${days === -1 ? '' : 's'} overdue` : days === 0 ? 'due today' : `due in ${days} day${days === 1 ? '' : 's'}`;
+}
+function ring(g, cls = '') {
+  return `<div class="pring ${g.risk && g.risk.at_risk ? 'risk' : ''} ${cls}" style="--p:${+g.progress_pct}" data-label="${+g.progress_pct}%"></div>`;
+}
+function renderGoalMini() {
+  $('goalMini').innerHTML = state.goals.length ? state.goals.slice(0, 5).map(g => `
+    <button onclick="${g.status === 'planning' ? `openChat(${g.id})` : "showView('goals')"}">${ring(g)}
+      <span style="min-width:0"><span class="name" style="display:block">${esc(g.title)}</span>
+      <span class="small muted">${g.status === 'planning' ? 'Still planning: tap to continue'
+        : g.book ? `page ${g.book.read} of ${g.book.pages}` : `${g.done} of ${g.total} steps`}${g.deadline ? ', ' + esc(dueText(g.deadline)) : ''}</span></span>
+      ${g.risk ? `<span class="pill ${g.risk.at_risk ? 'risk' : 'ok'}">${g.risk.at_risk ? 'Slipping' : 'On track'}</span>` : ''}
+    </button>`).join('')
+    : `<p class="muted small" style="margin:6px 0 0">No goals yet. <a href="#" onclick="showView('goals');$('goalTitle').focus();return false">Add your first goal</a> and it'll be broken into steps.</p>`;
+}
+function renderGoals(thinkingTitle) {
+  const open = new Set([...document.querySelectorAll('.goal details[open]')].map(d => d.dataset.id));
+  let html = thinkingTitle ? `<article class="goal"><div class="goal-head"><div class="pring" style="--p:0" data-label="…"></div>
+    <div><h3>${esc(thinkingTitle)}</h3><div class="meta">Breaking it into steps…</div></div></div>
+    <div class="thinking"><div></div><div></div><div></div></div></article>` : '';
+  html += state.goals.map(g => {
+    const steps = state.tasks.filter(t => t.goal_id === g.id && !(t.status === 'missed'));
+    const risk = g.risk && g.risk.at_risk, planning = g.status === 'planning';
+    const progress = g.book ? `page ${g.book.read} of ${g.book.pages}` : g.habits ? g.habits.map(h => `${esc(h.title)}, ${h.minutes} min`).join('; ')
+      : `${g.done} of ${g.total} steps done`;
+    if (planning) return `<article class="goal"><div class="goal-head"><div class="pring" style="--p:0" data-label="…"></div>
+        <div style="min-width:0"><span class="kind">${KIND_NAMES[g.kind] || 'Goal'}</span><h3>${esc(g.title)}</h3>
+          <div class="meta"><span class="pill ok">Still planning</span></div></div>
+        <button class="icon-btn" onclick="deleteGoal(${g.id})" aria-label="Delete goal ${esc(g.title)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button></div>
+        <div class="add-step"><button class="btn small" onclick="openChat(${g.id})">Continue planning</button></div></article>`;
+    return `<article class="goal">
+      <div class="goal-head">${ring(g)}
+        <div style="min-width:0"><span class="kind">${KIND_NAMES[g.kind] || 'Goal'}${g.plan_summary ? ': ' + esc(g.plan_summary) : ''}</span><h3>${esc(g.title)}</h3>
+          <div class="meta"><span>${progress}</span>${g.deadline ? `<span>${esc(dueText(g.deadline))}</span>` : ''}
+          ${g.risk ? `<span class="pill ${risk ? 'risk' : 'ok'}">${risk ? 'Slipping' : 'On track'}</span>` : ''}</div></div>
+        <button class="icon-btn" onclick="deleteGoal(${g.id})" aria-label="Delete goal ${esc(g.title)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
+      </div>
+      ${risk ? `<div class="goal-risk">${esc(g.risk.detail)} Tomorrow's plan will put it first.</div>` : ''}
+      <details data-id="${g.id}" ${open.has(String(g.id)) ? 'open' : ''}><summary>${steps.length} step${steps.length === 1 ? '' : 's'}</summary>
+        <ul class="steps">${steps.map(t => `<li class="step ${t.status === 'done' ? 'done' : ''}">
+          <input type="checkbox" class="check" ${t.status === 'done' ? 'checked' : ''} onchange="toggleStep(${t.id}, this)" aria-label="Mark ${esc(t.title)} done" />
+          <span class="st">${esc(t.title)}</span>
+          <span class="step-meta"><i class="dot ${esc(t.energy_required)}" title="${ENERGY[t.energy_required] || ''}"></i>${t.estimated_minutes} min</span></li>`).join('')}</ul>
+        <form class="add-step" onsubmit="addStep(event, ${g.id})">
+          <input class="input" maxlength="200" placeholder="Add a step" aria-label="Add a step to ${esc(g.title)}" required />
+          <button class="btn small quiet" type="submit">Add</button></form>
+      </details>
+      ${g.kind !== 'general' ? `<div class="ideas" id="ideas-${g.id}"><button class="btn small quiet" style="justify-self:start" onclick="loadIdeas(${g.id}, this)">${g.kind === 'book' ? 'Find similar books and newsletters' : 'Find newsletters on this'}</button></div>` : ''}
+      </article>`;
+  }).join('');
+  $('goalList').innerHTML = html || `<div class="empty"><h3>No goals yet</h3><p style="margin:0">Write one on the left. "Read Atomic Habits", "Gym 4 days a week" or "Pass the GRE in March" all work.</p></div>`;
+}
+// ---------- planning chat ----------
+let chat = null;     // {goalId, plan}
+function chatBubble(m) {
+  if (m.role === 'tool' && m.card) {
+    const c = m.card;
+    return `<div class="found"><span class="spine" aria-hidden="true"></span><span>
+      <b>${esc(c.title)}</b>${c.author ? esc(c.author) + ', ' : ''}${c.pages} pages
+      ${c.url ? `<br><a href="${esc(c.url)}" target="_blank" rel="noopener" class="small">Found on ${esc(c.source)}</a>` : ''}</span></div>`;
+  }
+  if (m.role === 'tool') return '';
+  let html = `<div class="msg ${m.role === 'user' ? 'user' : 'assistant'}">${esc(m.content)}</div>`;
+  if (m.plan) html += planCard(m.plan);
+  return html;
+}
+function planCard(p) {
+  const preview = p.steps.slice(0, 3).map(s => `<li>${esc(s.title)} (${s.minutes} min)</li>`).join('')
+    + (p.steps.length > 3 ? `<li>…and ${p.steps.length - 3} more</li>` : '')
+    + p.recurring.map(r => `<li>${esc(r.title)}: ${r.minutes} min, ${esc(daysLabel(r.weekdays))}</li>`).join('')
+    + p.routines.map(r => `<li>${esc(r.title)}: ${esc(r.start)}–${esc(r.end)}, ${esc(daysLabel(r.weekdays))} (blocked as busy)</li>`).join('');
+  return `<div class="plan-card"><h4>${esc(p.summary)}</h4>
+    <ul>${p.lines.map(l => `<li class="${p.late && /after your deadline/.test(l) ? 'late' : ''}">${esc(l)}</li>`).join('')}${preview}</ul>
+    <div class="actions"><button class="btn" onclick="acceptPlan(this)">Add to my plan</button></div></div>`;
+}
+function daysLabel(days) {
+  const k = days.join(',');
+  return k === '0,1,2,3,4,5,6' ? 'every day' : k === '0,1,2,3,4' ? 'weekdays' : k === '5,6' ? 'weekends' : days.map(d => DAY_SHORT[d]).join(', ');
+}
+function renderChat(data, thinking) {
+  chat = {goalId: data.goal.id, plan: data.plan};
+  $('goalForm').hidden = true; $('goalChat').hidden = false;
+  $('chatTitle').textContent = data.goal.title;
+  $('chatKind').textContent = (KIND_NAMES[data.goal.kind] || 'Goal') + (data.engine === 'ai' ? ', planning with AI' : '');
+  const log = $('chatLog');
+  log.innerHTML = data.messages.map(chatBubble).join('') + (thinking ? '<div class="typing" aria-label="Thinking"><span></span><span></span><span></span></div>' : '');
+  const last = [...data.messages].reverse().find(m => m.role === 'assistant');
+  const quick = thinking ? [] : (last && last.quick_replies) || [];
+  $('chatQuick').innerHTML = quick.map(q => `<button class="chip" data-q="${esc(q)}">${esc(q)}</button>`).join('')
+    + (!thinking && !data.plan ? `<button class="chip" data-skip="1">Skip the questions</button>` : '');
+  log.scrollTop = log.scrollHeight;
+  if (!thinking) $('chatText').focus({preventScroll: true});
+}
+$('chatQuick').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  if (b.dataset.skip) quickPlan(); else sendChat(null, b.dataset.q);
+});
+const startChat = run(async (e) => {
+  e.preventDefault();
+  const title = $('goalTitle').value.trim(), btn = $('goalBtn');
+  btn.disabled = true; btn.textContent = 'Starting…';
+  renderChat({goal: {id: 0, title, kind: 'general'}, messages: [{role: 'user', content: title}], engine: ''}, true);
+  try {
+    const data = await api('/goals/chat', {method: 'POST', body: {title, deadline: $('goalDeadline').value || null}});
+    $('goalTitle').value = ''; $('goalDeadline').value = '';
+    renderChat(data); refreshAll(); refreshMe();
+    if (data.note) toast(data.note + ' I\'ll use quick questions instead.');
+  } catch (err) { closeChat(); throw err; }
+  finally { btn.disabled = false; btn.textContent = 'Start planning'; }
+});
+const openChat = run(async (goalId) => {
+  showView('goals');
+  renderChat(await api(`/goals/${goalId}/chat`));
+  $('goalPanel').scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'start'});
+});
+let chatBusy = false;
+const sendChat = run(async (e, text) => {
+  if (e) e.preventDefault();
+  text = (text ?? $('chatText').value).trim();
+  if (!text || !chat || chatBusy) return;
+  chatBusy = true; $('chatText').value = '';
+  const current = await api(`/goals/${chat.goalId}/chat`);
+  current.messages.push({role: 'user', content: text});
+  renderChat(current, true);
+  try { renderChat(await api(`/goals/${chat.goalId}/chat`, {method: 'POST', body: {message: text}})); }
+  finally { chatBusy = false; }
+});
+const quickPlan = run(async () => { renderChat(await api(`/goals/${chat.goalId}/plan/quick`, {method: 'POST'})); });
+const acceptPlan = run(async (btn) => {
+  btn.disabled = true;
+  try {
+    const r = await api(`/goals/${chat.goalId}/plan/accept`, {method: 'POST'});
+    closeChat(); await refreshAll();
+    const parts = [r.tasks && `${r.tasks} sessions`, r.recurring && `${r.recurring} repeating`, r.routines && `${r.routines} blocked in your week`].filter(Boolean);
+    toast(`Added: ${parts.join(', ')}. Press Plan my day to see today's part.`);
+  } finally { btn.disabled = false; }
+});
+function closeChat() { chat = null; $('goalChat').hidden = true; $('goalForm').hidden = false; }
+const loadIdeas = run(async (goalId, btn) => {
+  btn.disabled = true; btn.textContent = 'Looking…';
+  try {
+    const s = await api(`/goals/${goalId}/suggestions`);
+    const items = s.books.map(b => `<div class="idea"><a href="${esc(b.url || '#')}" target="_blank" rel="noopener">${esc(b.title)}</a>
+        <span class="muted">${b.author ? esc(b.author) + ', ' : ''}${b.pages ? b.pages + ' pages' : ''}</span>${b.description ? `<span class="muted">${esc(b.description)}</span>` : ''}</div>`)
+      .concat(s.newsletters.map(n => `<div class="idea"><a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.name)}</a><span class="muted">Substack newsletter. ${esc(n.why)}</span></div>`));
+    $('ideas-' + goalId).innerHTML = items.join('') || '<p class="small muted" style="margin:0">Nothing suitable found this week. I\'ll look again on Sunday.</p>';
+  } catch (err) { btn.disabled = false; btn.textContent = 'Try again'; throw err; }
+});
+const addStep = run(async (e, goalId) => {
+  e.preventDefault();
+  const input = e.target.querySelector('input');
+  await api('/tasks', {method: 'POST', body: {title: input.value.trim(), goal_id: goalId}});
+  input.value = ''; await refreshAll();
+  const d = document.querySelector(`.goal details[data-id="${goalId}"]`); if (d) { d.open = true; d.querySelector('.add-step input').focus(); }
+});
+const toggleStep = run(async (id, el) => {
+  if (el.checked) burst(el);
+  await api(`/tasks/${id}`, {method: 'PATCH', body: {status: el.checked ? 'done' : 'pending'}});
+  refreshAll();
 });
 const deleteGoal = run(async (id) => {
-  if (!confirm('Delete this goal and its tasks?')) return;
-  await api(`/goals/${id}`, {method: 'DELETE'}); loadGoals(); loadPlan();
+  if (!confirm('Delete this goal and all its steps?')) return;
+  await api(`/goals/${id}`, {method: 'DELETE'}); refreshAll(); toast('Goal deleted.');
 });
 
-// ---------- calendar ----------
-const loadCal = run(async () => {
-  const blocks = await api('/calendar');
-  $('calList').innerHTML = blocks.map(b => `<li><span class="time">${esc(b.start)}–${esc(b.end)}</span>
-    <span class="title">${esc(b.title)}</span>
-    <button class="small ghost danger" onclick="deleteCal(${b.id})" aria-label="delete">✕</button></li>`).join('')
-    || '<li class="muted">Nothing blocked today.</li>';
+// ================= SETTINGS =================
+function openSettings() { renderMe(); renderWeek(); settings.showModal(); }
+const renderWeek = run(async () => {
+  const [rs, off] = await Promise.all([api('/routines'), api('/days')]);
+  $('routineList').innerHTML = rs.map(r => `<div class="week-row"><span><b>${esc(r.title)}</b> ${r.auto ? esc(r.start) + '–' + esc(r.end) + ', ' : ''}${esc(r.days_text)}${r.note ? `<br><span class="muted">${esc(r.note)}</span>` : ''}</span>
+    <button class="btn small quiet" onclick="deleteRoutine(${r.id})">Remove</button></div>`).join('');
+  $('daysOffList').innerHTML = off.map(d => `<div class="week-row"><span><b>${esc(new Date(d.date + 'T12:00').toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'}))}</b> off${d.note ? ': ' + esc(d.note) : ''}</span>
+    <button class="btn small quiet" onclick="removeDayOff('${esc(d.date)}')">Remove</button></div>`).join('');
 });
-const addCal = run(async (e) => {
-  e.preventDefault();
-  // "today" in the account's timezone, matching what the server plans for
-  const date = new Intl.DateTimeFormat('en-CA', {timeZone: me.timezone}).format(new Date());
-  await api('/calendar', {method: 'POST', body: {date, start_time: $('calStart').value, end_time: $('calEnd').value, title: $('calTitle').value || 'Busy'}});
-  $('calTitle').value = ''; loadCal(); loadPlan();
+const savePattern = run(async (p, fromCard) => {
+  store.set('askedPattern', '1');
+  me = await api('/auth/me', {method: 'PATCH', body: {day_pattern: p}}); renderMe(); await refreshAll();
+  toast(p === 'varies' ? 'Got it. Each morning I\'ll ask how the day looks before planning it.' : 'Got it. I\'ll plan your days ahead.');
 });
-const deleteCal = run(async (id) => { await api(`/calendar/${id}`, {method: 'DELETE'}); loadCal(); loadPlan(); });
+const deleteRoutine = run(async (id) => { await api(`/routines/${id}`, {method: 'DELETE'}); renderWeek(); refreshAll(); toast('Removed from your week.'); });
+const addDayOff = run(async () => {
+  const d = $('offDate').value; if (!d) { toast('Pick a date first.'); return; }
+  await api(`/days/${d}`, {method: 'PUT', body: {kind: 'off', note: 'Leave'}}); $('offDate').value = '';
+  renderWeek(); refreshAll(); toast('Day off added. Work and classes won\'t be planned that day.');
+});
+const removeDayOff = run(async (d) => { await api(`/days/${d}`, {method: 'DELETE'}); renderWeek(); refreshAll(); });
+settings.addEventListener('click', e => { if (e.target === settings) settings.close(); });
+const saveName = run(async () => { me = await api('/auth/me', {method: 'PATCH', body: {name: $('setName').value}}); renderMe(); toast('Name saved.'); });
+const syncTimezone = run(async () => { me = await api('/auth/me', {method: 'PATCH', body: {timezone: TZ}}); renderMe(); refreshAll(); toast(`Timezone set to ${TZ}.`); });
+const savePref = run(async (key, el) => {
+  try { me = await api('/auth/me', {method: 'PATCH', body: {[key]: el.checked}}); renderMe(); }
+  catch (err) { el.checked = !el.checked; throw err; }
+  toast(el.checked ? 'Turned on.' : 'Turned off. You won\'t get this email.');
+});
+const resendVerification = run(async (btn) => {
+  btn.disabled = true;
+  try { const r = await api('/email/resend-verification', {method: 'POST'});
+    toast(r.already_verified ? 'Your email is already confirmed.' : `Link sent to ${me.email}.`); }
+  finally { btn.disabled = false; }
+});
+const sendPlanNow = run(async (btn) => {
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try { const r = await api('/email/send-plan', {method: 'POST'}); toast(`Today's plan is on its way to ${r.to}.`); }
+  finally { btn.disabled = !me.email_verified; btn.textContent = 'Email me today\'s plan'; }
+});
+const saveHour = run(async (el) => {
+  me = await api('/auth/me', {method: 'PATCH', body: {email_morning_hour: +el.value}}); renderMe();
+  toast(`Your plan will arrive at ${el.value}:00 each morning.`);
+});
+const retryEmail = run(async (btn) => {
+  btn.disabled = true;
+  try { await api('/email/retry', {method: 'POST'}); await refreshMe(); toast('We\'ll try your address again.'); }
+  finally { btn.disabled = false; }
+});
+function previewEmail() { $('previewFrame').src = '/email/preview?t=' + Date.now(); previewDialog.showModal(); }
 
-// ---------- notifications ----------
-const setupNotif = run(async (e) => {
-  e.preventDefault();
-  await api('/setup/notifications', {method: 'POST', body: {topic: $('topic').value}});
-  toast('Connected. Check your devices for a test notification.'); refreshMe();
-});
-const disconnectNotif = run(async () => { await api('/setup/notifications', {method: 'DELETE'}); refreshMe(); });
-
-// ---------- boot ----------
+// ================= BOOT =================
+setInterval(() => { if (me && !$('appView').hidden) renderTimeline(); }, 60000);   // keep the now-line moving
 (async () => {
+  const params = new URLSearchParams(location.search);
   try { me = await api('/auth/me'); showApp(); } catch (_) { showAuth(); }
+  if (params.get('checkin') && me) {
+    history.replaceState(null, '', '/');
+    toast({usual: 'Thanks. Today is planned as a usual day.', light: 'Thanks. Today is planned light.', off: 'Enjoy your day off.'}[params.get('checkin')] || 'Thanks.');
+  }
+  if (params.get('verified')) {
+    history.replaceState(null, '', '/');
+    toast(me ? `Email confirmed. Your plan will arrive each morning at ${me.email_morning_hour || 7}:00.` : 'Email confirmed. Log in to see your plan.');
+    if (me) refreshMe();
+  }
 })();
 </script>
 </body>

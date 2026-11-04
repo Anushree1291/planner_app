@@ -22,7 +22,7 @@ def start_scheduler():
     if _scheduler:
         return
     _scheduler = BackgroundScheduler()
-    _scheduler.add_job(_hourly, "cron", minute=2)
+    _scheduler.add_job(_hourly, "cron", minute="*/5")   # every 5 minutes, like the cloud timer
     _scheduler.start()
 
 
